@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 type fakeRunner struct {
@@ -494,6 +495,10 @@ func TestCLIHelpDoesNotNeedRuntime(t *testing.T) {
 func TestRepeatLaunchUsesLuaFocusDispatcher(t *testing.T) {
 	a, r := testApp(t)
 	t.Setenv("HYPRLAND_INSTANCE_SIGNATURE", "test-session")
+	// Keep an unexpected launch entirely local rather than provisioning a real
+	// runtime over the network when process metadata is not available yet.
+	readyRuntime(t, a)
+	writeTestFile(t, a.gamePath(), []byte("game"))
 	if err := os.MkdirAll(a.Paths.Prefix, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -506,6 +511,17 @@ func TestRepeatLaunchUsesLuaFocusDispatcher(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = process.Process.Kill(); _ = process.Wait() }()
+	window := Window{Address: "0x123", Title: "Pokemon TCG Live", PID: process.Process.Pid, XWayland: true}
+	// /proc can briefly expose pre-exec metadata even after Start returns.
+	// Wait for this fixture's environment instead of racing its exec boundary.
+	deadline := time.Now().Add(2 * time.Second)
+	for !a.ownWindow(window) && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !a.ownWindow(window) {
+		env, err := os.ReadFile(fmt.Sprintf("/proc/%d/environ", process.Process.Pid))
+		t.Fatalf("process fixture metadata is unavailable: %v (environment bytes: %d)", err, len(env))
+	}
 	r.output = func(Command) ([]byte, error) {
 		return []byte(fmt.Sprintf(`[{"address":"0x123","title":"Pokemon TCG Live","pid":%d,"xwayland":true}]`, process.Process.Pid)), nil
 	}
