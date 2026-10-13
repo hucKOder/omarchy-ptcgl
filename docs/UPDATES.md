@@ -50,11 +50,20 @@ future releases.
 
 ## Launcher updates
 
-Close the game, obtain the new repository version, then run:
+Close the game and rerun the one-command installer in launcher-only mode:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/hucKOder/omarchy-ptcgl/main/install.sh | bash -s -- --launcher-only
+```
+
+It installs the latest published launcher release. A failed release download or
+checksum check stops installation before replacing the executable.
+
+For a local development checkout, obtain the new repository version, then run:
 
 ```sh
 make check
-make install
+make install-launcher
 ```
 
 The executable is replaced atomically and desktop integration is refreshed.

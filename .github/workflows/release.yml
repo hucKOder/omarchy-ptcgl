@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - run: make check
+      - run: make test
+      - name: Build Linux x86-64 launcher
+        run: |
+          [[ $GITHUB_REF_NAME =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
+          make build VERSION="${GITHUB_REF_NAME#v}"
+          cp build/ptcgl-omarchy build/ptcgl-omarchy-linux-amd64
+          sha256sum build/ptcgl-omarchy-linux-amd64 > build/ptcgl-omarchy-linux-amd64.sha256
+      - name: Publish launcher and checksum
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
+            --title "$GITHUB_REF_NAME" \
+            build/ptcgl-omarchy-linux-amd64 build/ptcgl-omarchy-linux-amd64.sha256

@@ -50,36 +50,31 @@ terminals while the layout changes.*
 
 ## Install
 
-### 1. Prepare your Omarchy system
-
-You need **x86-64 Omarchy**, the **Lua Hyprland configuration** (Hyprland 0.55+),
-working XWayland and Vulkan drivers, and approximately **8 GB of free space**.
-The launcher uses **Go 1.24+** to build and **UMU 1.4.4+** to run the game.
+Run one command in your Omarchy terminal:
 
 ```bash
-omarchy pkg add go make git umu-launcher zenity desktop-file-utils xdg-utils
-omarchy pkg aur add osslsigncode
+curl -fsSL https://raw.githubusercontent.com/hucKOder/omarchy-ptcgl/main/install.sh | bash
 ```
 
-Install Vulkan drivers appropriate for your GPU. AMD systems typically use
-`vulkan-radeon` and `lib32-vulkan-radeon`.
+Run as your regular desktop user. The installer handles the rest:
 
-### 2. Build and install
+- Installs dependencies through `omarchy pkg add` and `omarchy pkg aur add`.
+- Uses Omarchy's gaming helper to install the appropriate 32-bit GPU drivers.
+- Downloads the latest prebuilt launcher and verifies its SHA-256 checksum.
+- Adds **Pokémon TCG Live (Omarchy)** to the app launcher, registers browser
+  login, and installs the tiled-window rules.
+- Prepares Proton and installs the official Pokémon client, verifying the MSI's
+  signature and publisher. This first setup can take a while.
 
-```bash
-git clone https://github.com/hucKOder/omarchy-ptcgl.git
-cd omarchy-ptcgl
-make install
-```
-
-Run this as your regular desktop user. Installation adds **Pokémon TCG Live
-(Omarchy)** to the app menu, registers browser login, and installs a small
-Hyprland Lua module. The main Hyprland config is backed up before its loader
-block is added, and live window-rule changes are validated.
+You need **x86-64 Omarchy**, its **Lua Hyprland configuration** (Hyprland 0.55+),
+working XWayland and Vulkan, and approximately **8 GB of free space**. Omarchy
+requests your sudo password for system packages when needed. The main Hyprland
+config is backed up before its loader block is added, and live rule changes are
+validated.
 
 The installed executable is `~/.local/bin/ptcgl-omarchy`.
 
-### 3. Play
+### Play
 
 Open **Pokémon TCG Live (Omarchy)** from the app menu, or run:
 
@@ -87,9 +82,28 @@ Open **Pokémon TCG Live (Omarchy)** from the app menu, or run:
 ptcgl-omarchy
 ```
 
-The first launch shows setup progress while preparing Proton and installing the
-current official Pokémon client. The MSI's signature and publisher are verified
-before installation. Sign in using your normal browser when the game asks.
+Sign in using your normal browser when the game asks. If setup is interrupted,
+rerun the installer or open the app to resume setup.
+
+<details>
+<summary><strong>Install only the launcher, or install from a checkout</strong></summary>
+
+To leave the game download for the first app-menu launch:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hucKOder/omarchy-ptcgl/main/install.sh | bash -s -- --launcher-only
+```
+
+To build and install a local checkout, including dependencies and game setup:
+
+```bash
+git clone https://github.com/hucKOder/omarchy-ptcgl.git
+cd omarchy-ptcgl
+bash ./install.sh
+```
+
+`make install` runs the same local installation flow. Local builds need Go 1.24+
+and Make; the installer adds them through Omarchy when needed.
 
 Prefer the terminal? Setup and launch are also available separately:
 
@@ -97,6 +111,8 @@ Prefer the terminal? Setup and launch are also available separately:
 ptcgl-omarchy setup
 ptcgl-omarchy play
 ```
+
+</details>
 
 ## Updates
 
@@ -114,11 +130,11 @@ An unchanged MSI is skipped. Updates and repairs use the existing prefix;
 maintenance is blocked while the launcher-managed game session is running.
 `update --check` compares the official MSI, not the game's in-client patch state.
 
-**Launcher and Proton updates are separate.** To install a newer launcher:
+**Launcher and Proton updates are separate.** Close the game and rerun the
+installer to get the latest launcher:
 
 ```bash
-git pull --ff-only
-make install
+curl -fsSL https://raw.githubusercontent.com/hucKOder/omarchy-ptcgl/main/install.sh | bash -s -- --launcher-only
 ```
 
 Your selected Proton profile is retained. To explicitly select the profile
@@ -212,8 +228,16 @@ make test
 make build
 ```
 
-Tests cover verified downloads, archive extraction, update locking, prefix
-preservation, callback delivery, runtime selection, and integration recovery.
+With dependencies already installed, `make install-launcher` installs your local
+build and refreshes desktop integration without running game setup.
+
+Version tags such as `v0.1.0` trigger the release workflow, which runs the checks
+and publishes the Linux x86-64 launcher and its SHA-256 checksum. The one-command
+installer uses those releases without requiring Go, Make, or a repository clone.
+
+Tests cover the one-command installer, verified downloads, archive extraction,
+update locking, prefix preservation, callback delivery, runtime selection, and
+integration recovery.
 Real graphics, browser authentication, in-game patching, and gameplay also need
 manual validation on Omarchy.
 

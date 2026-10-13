@@ -110,7 +110,7 @@ func (a *App) integrate(ctx context.Context) error {
 		return err
 	}
 	if !exists(a.Paths.Bin) {
-		return fmt.Errorf("install the executable first with make install")
+		return fmt.Errorf("install the executable first with the installer or make install-launcher")
 	}
 	main := filepath.Join(a.Paths.Hypr, "hyprland.lua")
 	original, err := os.ReadFile(main)
