@@ -1,0 +1,8 @@
+{
+  "umu_minimum": "1.4.4",
+  "proton_release": "GE-Proton11-7",
+  "proton_directory": "GE-Proton11-7-x86_64",
+  "proton_url": "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-7/GE-Proton11-7-x86_64.tar.gz",
+  "proton_sha256": "c5448b76a230384e2d7bc6beb5ccb97bafb7e2c3b6c527cb03a1a546bbcb00a0",
+  "installer_url": "https://installer.studio-prod.pokemon.com/installer/PokemonTCGLiveInstaller.msi"
+}
