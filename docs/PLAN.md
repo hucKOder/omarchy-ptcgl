@@ -33,22 +33,25 @@ Installation simplification takes priority over the remaining launcher QoL work.
 See [the installation plan](INSTALLATION-PLAN.md) for dependencies, implementation
 tasks, and release acceptance criteria:
 
-1. Resolve a supported package route for `osslsigncode`.
+1. Replace the external `osslsigncode` dependency with built-in verification.
 2. Generate one complete release-specific installation procedure, with no manual
    version/commit transcription or apparent second installation step.
 3. Improve prerequisite checks and failure messages.
 4. Add understandable setup progress and reliable, stage-specific recovery.
 5. Validate the published procedure on clean Omarchy with a first-time tester.
 
-The verifier's package channel is an open dependency. Documentation and release
-automation can proceed while it is investigated; simple-install acceptance needs
-the supported provisioning route.
+The v0.4.0 candidate embeds pinned Relic MSI verification, eliminating verifier
+packaging and AUR provisioning. Its source bootstrap installs repository tools,
+selects a release, and authenticates the release installer before execution.
+The README now leads with one command. Publication and clean-OS acceptance are
+still required before the new installation flow can be announced as available.
 
 Release-specific instruction generation, ready-to-run v0.2.0 instructions, and
 early GitHub CLI capability checks are implemented and covered by isolated tests.
-The package investigation confirmed `osslsigncode` is absent from the checked
-Arch/Omarchy binary channels; upstream packaging, setup progress/recovery, and
-clean-OS acceptance remain open. Published v0.3.0 authentication and the
+The earlier package investigation confirmed `osslsigncode` was absent from the
+checked Arch/Omarchy binary channels. That route is retained only for legacy
+releases; setup progress/recovery and clean-OS acceptance remain open.
+Published v0.3.0 authentication and the
 launcher-only upgrade are verified in the validation record.
 
 The local candidate was independently reviewed, review findings were fixed, and

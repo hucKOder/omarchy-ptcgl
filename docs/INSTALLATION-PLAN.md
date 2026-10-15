@@ -3,7 +3,9 @@
 Installation simplification is being delivered in stages. The v0.3.0 release adds
 complete release-specific instructions, prerequisite checks, and desktop QoL. The
 independent onboarding review on 2026-10-15 also identified dependency provisioning
-and recovery work that remains to be completed below.
+and recovery work. The v0.4.0 candidate now replaces the external verifier with
+built-in Relic verification and adds a one-command source bootstrap. Publication
+and clean-machine acceptance remain pending.
 
 ## Target experience
 
@@ -11,16 +13,19 @@ Choose a supported release, run the documented installation, open the app, and
 sign in. A normal user should not need to build packages, inspect a PKGBUILD,
 clone this repository, or transcribe a source commit.
 
-Keep release selection explicit. Show the selected version and source commit in
+Show the selected version and source commit in
 the published instructions and installation output. Generate those values from
 the release workflow's tag and checked-out source, rather than discovering the
-expected commit from an unverified downloaded manifest.
+expected commit from an unverified downloaded manifest. The one-command bootstrap
+uses GitHub's HTTPS tag API for automatic selection and displays that selection;
+independent version/commit pins remain available through explicit arguments or
+the release-specific manual block. See [the trust model](RELEASES.md).
 
 ## Delivery order
 
 | Priority | Work | Dependency |
 | --- | --- | --- |
-| P0 | Resolve verifier distribution | Needs a supported package channel and an accountable maintainer |
+| P0 | Remove external verifier distribution | Implemented in the v0.4.0 candidate with pinned Relic; release validation pending |
 | P1 | Publish one complete, release-specific installation procedure | Can start immediately alongside P0 |
 | P1 | Improve prerequisite checks and failure messages | Use the selected provisioning route once P0 is resolved |
 | P1 | Make setup progress and recovery predictable | Repository-local launcher changes |
@@ -33,7 +38,14 @@ part of the setup improvements below.
 
 ## 1. Resolve verifier distribution
 
-This is the critical path. Shorter documentation alone cannot remove the current
+**Superseded for v0.4.0:** built-in Relic verification removes the external package
+dependency. The original package investigation below remains relevant to legacy
+v0.2.0/v0.3.0 installations. No upstream package contribution is required for the
+new flow. The replacement preserves content/signature, publisher, code-signing
+certificate, and trusted timestamp checks. Dependency pins and negative tests
+are maintained with the launcher.
+
+This was the critical path for the legacy flow. Shorter documentation alone cannot remove its
 requirement for each player to review and build `osslsigncode`.
 
 - [x] Investigate existing Arch/Omarchy package channels. The
@@ -50,10 +62,10 @@ requirement for each player to review and build `osslsigncode`.
   route. Keep packaging review/build instructions for maintainers and advanced
   source installations.
 
-**Done when:** a new player can obtain the verifier through a documented,
+**Original package-route acceptance:** a new player can obtain the verifier through a documented,
 supported package transaction without personally auditing or building packaging.
-Until then, report the provisioning gap explicitly and describe the install path
-as requiring separately prepared dependencies.
+The legacy published installation path still requires separately prepared
+dependencies. The v0.4.0 source path does not.
 
 ## 2. Publish one complete installation procedure
 
@@ -179,8 +191,10 @@ metadata, launcher digest checks, the pinned Proton checksum, and MSI
 signature/certificate/publisher verification. The current installer and metadata
 checks protect different boundaries; removing one is not a documentation fix.
 
-Reusing the downloaded attestation bundle may save a request later. A new
-bootstrap verification protocol is outside this first simplification pass.
+The new source bootstrap is initial trusted code fetched over GitHub HTTPS. It
+automates tool provisioning and tag selection, then uses the existing release
+attestation protocol. This initial trust and the distinction from independently
+pinned manual installation are documented in the release guide.
 
 A native signed launcher package is a follow-up once the dependency route is
 settled. It would require package-owned executable paths and per-user desktop
@@ -189,7 +203,7 @@ replace the current release-authentication policy with package signatures.
 
 ## Next implementation slice
 
-Follow up on the Omarchy package contribution and implement setup progress and
-recovery. Release-specific instructions, published-artifact authentication, and
-the launcher-only upgrade are verified. The distribution handoff and clean-machine
-acceptance are still open; both are needed to complete the simple-install target.
+Publish and validate the v0.4.0 built-in verifier and one-command bootstrap on
+clean Omarchy, then implement setup progress and recovery. The existing v0.3.0
+release-specific installation and launcher-only upgrade remain verified. Legacy
+verifier packaging is no longer on the new installation's critical path.

@@ -15,7 +15,6 @@ usage() {
     "       bash install.sh --local [--launcher-only]" \
     "" \
     "Installs repository dependencies, desktop integration, and the game for your user." \
-    "Requires osslsigncode to be installed separately from reviewed packaging." \
     "--launcher-only  Leave game setup for the first app-menu launch." \
     "Run a downloaded installer only after verifying its release attestation." \
     "--local  Build the explicitly selected local checkout instead of a release."
@@ -77,7 +76,6 @@ main() {
   [[ -z ${XDG_CONFIG_HOME:-} || $XDG_CONFIG_HOME == /* ]] || fail "XDG_CONFIG_HOME must be an absolute path."
   hypr_config="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.lua"
   [[ -f $hypr_config ]] || fail "Omarchy's Lua Hyprland config is required at $hypr_config (Hyprland 0.55+)."
-  command -v osslsigncode >/dev/null || fail "osslsigncode is required to verify the official game installer. Provision it separately from reviewed packaging, then rerun this installer. See https://github.com/$REPOSITORY/blob/main/docs/AUR-DEPENDENCIES.md"
 
   if [[ -z $source_dir ]]; then
     for tool in curl jq gh sha256sum; do

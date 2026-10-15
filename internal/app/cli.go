@@ -27,6 +27,7 @@ Usage: ptcgl-omarchy <command> [options]
   open --gui          Choose a folder graphically
   uninstall          Remove binary and integration; retain installed game data
   version            Print launcher version
+  licenses           Print bundled software licenses
 
 setup, update, repair, runtime-update, doctor, and open accept --gui.
 Game patches run through the built-in updater at launch. update --check compares
@@ -44,6 +45,22 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 	}
 	if command == "version" || command == "--version" {
 		fmt.Fprintf(out, "%s %s\n", Name, Version)
+		return 0
+	}
+	if command == "licenses" {
+		fmt.Fprint(out, thirdPartyNotices)
+		return 0
+	}
+	// Private worker: independent of launcher configuration and desktop state.
+	if command == "__verify-installer" {
+		if len(args) != 1 {
+			fmt.Fprintln(errOut, "installer verification requires one MSI path")
+			return 2
+		}
+		if err := verifyMSI(ctx, args[0], nil); err != nil {
+			fmt.Fprintln(errOut, err)
+			return 1
+		}
 		return 0
 	}
 	fs := flag.NewFlagSet(command, flag.ContinueOnError)

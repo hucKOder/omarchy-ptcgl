@@ -46,6 +46,9 @@ func generatedNotes(t *testing.T, version, commit string) string {
 
 func installBlock(t *testing.T, notes string) string {
 	t.Helper()
+	if _, manual, ok := strings.Cut(notes, "### Manual, independently pinned installation\n"); ok {
+		notes = manual
+	}
 	_, block, ok := strings.Cut(notes, "```bash\n")
 	if !ok {
 		t.Fatal("installation block is missing")
@@ -128,13 +131,18 @@ func TestReleaseAssets(t *testing.T) {
 	}
 }
 
-func TestPublishedBootstrapMatchesGeneratedInstructions(t *testing.T) {
+func TestLegacyPublishedBootstrapRetainsRequiredVerifier(t *testing.T) {
 	const publishedCommit = "5e3e96bff7a5bcff0b093dc64dc12538d813148e"
 	doc, err := os.ReadFile("../../docs/RELEASES.md")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if installBlock(t, string(doc)) != installBlock(t, generatedNotes(t, "v0.2.0", publishedCommit)) {
+	legacy := installBlock(t, string(doc))
+	check := `  command -v osslsigncode >/dev/null || fail "osslsigncode is required. See https://github.com/$repository/blob/$source_commit/docs/AUR-DEPENDENCIES.md"` + "\n"
+	if !strings.Contains(legacy, check) {
+		t.Fatal("historical v0.2.0 instructions lost their required external verifier")
+	}
+	if strings.Replace(legacy, check, "", 1) != installBlock(t, generatedNotes(t, "v0.2.0", publishedCommit)) {
 		t.Fatal("published-release fallback differs from the generated installation procedure")
 	}
 }

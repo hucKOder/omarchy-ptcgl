@@ -1,10 +1,16 @@
-# Provisioning osslsigncode
+# Legacy releases: provisioning osslsigncode
+
+**The v0.4.0 launcher replaces this external dependency with built-in
+MSI signature verification.** Installation from the current source needs no AUR
+packages. See [the release guide](RELEASES.md#one-command-installation-v040-and-later).
+This page is retained for the already-published v0.2.0/v0.3.0 installers, whose
+artifacts still require `osslsigncode`.
 
 `osslsigncode` verifies the official Pokémon MSI's signature, certificate chain,
 and publisher before the launcher runs it. It is a trusted dependency: a modified
 verifier could undermine those checks.
 
-The project installer requires it on `PATH` before installing dependencies,
+The legacy project installer requires it on `PATH` before installing dependencies,
 downloading a launcher, or building a local checkout. This applies to normal and
 `--launcher-only` installation. It does not fetch, build, or install AUR packages.
 

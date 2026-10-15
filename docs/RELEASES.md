@@ -1,5 +1,48 @@
 # Authenticated launcher releases
 
+## One-command installation (v0.4.0 and later)
+
+The README's one-line command downloads `bootstrap.sh` from this project's source
+on GitHub over HTTPS. The bootstrap is the initial trusted code, like the commands
+copied from this page; it cannot authenticate itself after execution starts.
+
+It installs `github-cli`, `curl`, `jq`, `coreutils`, and `ca-certificates` through
+Omarchy's system-repository tooling. It selects the latest stable release and
+resolves its source commit through GitHub's tag API, following annotated tags.
+This trusts GitHub's HTTPS metadata for release selection. The selected version
+and full commit are displayed before downloading release code. The bootstrap
+never takes the expected commit from the release manifest.
+
+The bootstrap then authenticates the release installer using the attestation
+policy below **before executing it**. The installer authenticates the manifest
+and launcher before installing them. Failed verification never falls back to a
+source build. Bootstrap tools may already have been installed when verification
+fails; the existing launcher and game are preserved.
+
+The v0.4.0 release is the first supported version. Older published
+releases still need their original prerequisites and installation instructions.
+
+To select an independently established version and commit, download/review
+`bootstrap.sh` and pass `--release vX.Y.Z --source-commit FULL_40_HEX_COMMIT`,
+or use the release-specific complete block below. `--launcher-only` skips game
+setup. No GitHub login is required.
+
+MSI verification is built into the launcher using Relic v8.2.0 and Go's X.509
+verification, with dependencies pinned by `go.mod`/`go.sum`. CIRCL is explicitly
+pinned to v1.6.3 to include fixes absent from Relic's original dependency set.
+Verification checks the MSI content digest, signature, code-signing certificate
+chain, timestamp signature/chain when present, and the primary signer's exact
+Pokémon publisher identity. Publisher and timestamp certificates' advertised CRLs
+are fetched and checked for issuer signatures, freshness, scope, and revocation;
+unavailable or invalid revocation data stops verification. Delta, indirect, and
+reason-restricted CRLs are rejected rather than assumed to cover the signer.
+System certificate authorities are used; embedded
+certificates do not become trusted roots. A private child process bounds
+verification with a two-minute deadline. No external verifier or AUR package is
+needed. This removes the AUR packaging trust boundary; it is not a claim that
+the replacement library is vulnerability-free. Release maintenance includes
+dependency vulnerability checks and negative verification tests.
+
 ## Trust model
 
 Release artifacts use GitHub artifact attestations backed by short-lived Sigstore
@@ -30,13 +73,16 @@ The workflow fills in its version and source commit; no manual substitution is
 needed. The block performs the full installation, including verification before
 the downloaded installer runs.
 
-Prepare bootstrap tools with `omarchy pkg add github-cli curl jq coreutils` and
-provision [`osslsigncode`](AUR-DEPENDENCIES.md) separately. GitHub CLI 2.102.0 is
-tested; required verification capabilities are checked before downloading.
+For the manual block, prepare bootstrap tools with
+`omarchy pkg add github-cli curl jq coreutils ca-certificates`.
+GitHub CLI 2.102.0 is tested; required verification capabilities are checked before downloading.
 Bundle-based verification does not require a GitHub login. Network access may
 still be needed for Sigstore trust metadata.
 
 ### Existing v0.2.0 release
+
+The v0.2.0 and v0.3.0 launchers still need a separately provisioned
+[`osslsigncode`](AUR-DEPENDENCIES.md). Their published binaries are unchanged.
 
 The following block is ready to run for **v0.2.0**, whose
 [published announcement](https://github.com/hucKOder/omarchy-ptcgl/releases/tag/v0.2.0)
@@ -91,8 +137,8 @@ installer as data, verifies `install.sh`, and then runs the installation:
 For a launcher-only installation or upgrade, append `--launcher-only` to the final
 `bash` command inside the block. Do not run a second installer command afterward.
 Rerun the selected release's complete procedure for each installation or upgrade.
-Do not replace it with execution of `main/install.sh` through a
-pipe: an installer cannot establish trust in its own code after it starts running.
+The source bootstrap described above is a separate initial trust choice. Running
+`main/install.sh` through a pipe is not equivalent to either verified procedure.
 
 The installer authenticates `release.json` from the same release identity, checks
 its version/source/platform, and checks the downloaded launcher's SHA-256 before
@@ -119,8 +165,10 @@ locations are fixed by the installer rather than supplied by that manifest.
 
 ## Maintainer release procedure
 
-1. Review and commit the release source, including installer, tests, and workflow.
-   Run `make check`, `make test`, and `make build`.
+1. Review and commit the release source, including bootstrap, installer, dependency
+   pins, tests, and workflow. After dependency changes, run `make licenses` to
+   refresh the notices embedded in the binary. Run `make check`, `make test`, and `make build`, plus
+   `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...` with a supported Go toolchain.
 2. Select a new version and record its source commit. Create and push its tag when
    ready to publish. The tag must identify the reviewed commit; protect release
    tags and workflow changes using repository access controls.

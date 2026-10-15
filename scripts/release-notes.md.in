@@ -3,28 +3,35 @@ Source commit: `@SOURCE_COMMIT@`
 
 ## Highlights
 
-- Complete release-pinned installation instructions with early prerequisite checks.
-- Desktop actions for checking installer updates, repairing the game, and opening
-  game/configuration/cache folders.
-- Clear graphical results for installer checks, updates, and repairs.
-- Actionable `doctor` guidance in terminal, GUI, and JSON reports, plus visible
-  graphical errors when configuration cannot be loaded.
-- Readable embedded desktop templates and correct prerelease classification.
+- One-command installation with automatic repository dependencies and built-in
+  MSI signature, publisher, and certificate verification; no AUR packages.
+- Complete release-pinned installation instructions remain available below.
+- Signature checks retain publisher, certificate-chain, timestamp, and online
+  revocation verification without an external verifier.
+- Pinned Go dependencies, automated vulnerability checks, and bundled license notices.
 
 ## Install
+
+Copy this one line into your terminal as your regular desktop user:
+
+```bash
+bash -c 'script=$(curl -fsSL https://raw.githubusercontent.com/hucKOder/omarchy-ptcgl/@SOURCE_COMMIT@/bootstrap.sh) && bash -c "$script" -- --release @RELEASE@ --source-commit @SOURCE_COMMIT@'
+```
+
+The source bootstrap is trusted from GitHub over HTTPS; it installs verification
+tools from system repositories, then authenticates the release installer and
+launcher before executing them. No AUR packages or GitHub login are needed.
+
+### Manual, independently pinned installation
 
 Requires x86-64 Omarchy, its Lua Hyprland configuration (Hyprland 0.55+),
 working XWayland/Vulkan, and roughly 8 GB of free space. Close the game before
 installing or upgrading the launcher.
 
-1. Install the bootstrap tools with `omarchy pkg add github-cli curl jq coreutils`.
+1. Install the bootstrap tools with `omarchy pkg add github-cli curl jq coreutils ca-certificates`.
    GitHub CLI 2.102.0 is tested; the block below checks the required verification
    capabilities. No GitHub login is required for bundle-based verification.
-2. Make sure `osslsigncode` is available using
-   [the verifier provisioning guide](https://github.com/hucKOder/omarchy-ptcgl/blob/@SOURCE_COMMIT@/docs/AUR-DEPENDENCIES.md).
-   It is still a separately provisioned prerequisite, including for launcher-only
-   upgrades.
-3. Copy the **entire block** below into Bash as your regular desktop user. The
+2. Copy the **entire block** below into Bash as your regular desktop user. The
    release and source commit are already selected. This block verifies the
    downloaded installer **before executing it**, then installs the launcher and
    game. There is no second installer command to run afterward.
@@ -44,7 +51,6 @@ installing or upgrading the launcher.
   for tool in curl jq gh sha256sum; do
     command -v "$tool" >/dev/null || fail "Missing $tool. Run: omarchy pkg add github-cli curl jq coreutils"
   done
-  command -v osslsigncode >/dev/null || fail "osslsigncode is required. See https://github.com/$repository/blob/$source_commit/docs/AUR-DEPENDENCIES.md"
   verify_help=$(gh attestation verify --help) || fail 'Update github-cli to a version supporting artifact attestations.'
   for option in --bundle --hostname --repo --cert-identity --cert-oidc-issuer --source-ref --source-digest --signer-digest --deny-self-hosted-runners --predicate-type; do
     [[ $verify_help == *"$option"* ]] || fail "GitHub CLI is missing $option. Update github-cli through Omarchy, then retry this block."
@@ -72,6 +78,9 @@ installing or upgrading the launcher.
 Omarchy requests your sudo password for system packages. Proton and the official
 game are downloaded during setup. When **Installed!** appears, open **Pokémon TCG
 Live (Omarchy)** from the app menu and sign in through your browser.
+
+MSI signature, publisher, and certificate-chain verification is built into the
+launcher. No AUR packages or separate signature-verification tool are required.
 
 ### Launcher-only installation or upgrade
 

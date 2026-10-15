@@ -27,7 +27,6 @@ func (a *App) Doctor(ctx context.Context) []Check {
 		{"omarchy", "Run from your Omarchy desktop session with Omarchy's bin directory in PATH."},
 		{"hyprctl", "Run from your Hyprland desktop session with hyprctl in PATH."},
 		{"umu-run", "omarchy pkg add umu-launcher"},
-		{"osslsigncode", "Provision osslsigncode using reviewed packaging: https://github.com/hucKOder/omarchy-ptcgl/blob/main/docs/AUR-DEPENDENCIES.md"},
 		{"zenity", "omarchy pkg add zenity"},
 		{"xdg-mime", "omarchy pkg add xdg-utils"},
 	} {

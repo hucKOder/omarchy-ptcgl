@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-const releaseVersion = "v0.2.0"
+const releaseVersion = "v0.4.0"
 const releaseCommit = "0123456789abcdef0123456789abcdef01234567"
 
 const launcherFixture = `#!/bin/bash
@@ -127,11 +127,16 @@ func TestInstaller(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	quickScript, err := os.ReadFile("../../bootstrap.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range []struct {
 		name, downloadMode   string
 		args                 []string
 		local, piped         bool
 		bootstrap            bool
+		quick, discover      bool
 		noConfig, noVerifier bool
 		noSelection, noGH    bool
 		oldGH                bool
@@ -139,6 +144,43 @@ func TestInstaller(t *testing.T) {
 		wantError            bool
 		want, absent         []string
 	}{
+		{
+			name: "one-command latest installation needs no AUR verifier", quick: true, discover: true, noVerifier: true,
+			want: []string{"omarchy pkg add github-cli curl jq coreutils ca-certificates", "git/ref/tags/" + releaseVersion, "launcher install", "launcher setup"},
+		},
+		{
+			name: "one-command pinned launcher upgrade", quick: true, noVerifier: true, args: []string{"--launcher-only"},
+			want: []string{"launcher install"}, absent: []string{"api.github.com", "launcher setup"},
+		},
+		{
+			name: "one-command follows annotated tag", quick: true, discover: true, downloadMode: "api-annotated",
+			want: []string{"git/tags/" + releaseCommit, "launcher setup"},
+		},
+		{
+			name: "one-command rejects old release", quick: true, discover: true, downloadMode: "api-old-release", wantError: true,
+			absent: []string{"launcher install"},
+		},
+		{
+			name: "one-command rejects non-commit tag", quick: true, discover: true, downloadMode: "api-invalid-ref", wantError: true,
+		},
+		{
+			name: "one-command authenticates installer before execution", quick: true, downloadMode: "bootstrap-tampered", wantError: true,
+			absent: []string{"unverified bootstrap ran", "launcher install"},
+		},
+		{
+			name: "one-command rejects wrong source", quick: true, discover: true, downloadMode: "wrong-commit", wantError: true,
+		},
+		{
+			name: "one-command rejects unavailable attestations", quick: true, downloadMode: "bundle-missing", wantError: true,
+		},
+		{
+			name: "one-command checks GitHub CLI capabilities", quick: true, oldGH: true, wantError: true,
+			absent: []string{"curl --"},
+		},
+		{
+			name: "one-command package failure stops", quick: true, pkgFail: true, wantError: true,
+			absent: []string{"curl --", "gh ", "launcher "},
+		},
 		{
 			name: "release prepares game", piped: true,
 			want:   []string{"omarchy pkg add umu-launcher", "omarchy install gaming gpu-lib32", "launcher install", "launcher setup"},
@@ -160,8 +202,8 @@ func TestInstaller(t *testing.T) {
 			name: "generated bootstrap rejects wrong source commit", bootstrap: true, downloadMode: "wrong-commit", wantError: true,
 		},
 		{
-			name: "generated bootstrap requires verifier before downloading", bootstrap: true, noVerifier: true, wantError: true,
-			absent: []string{"curl ", "gh "},
+			name: "generated bootstrap needs no external MSI verifier", bootstrap: true, noVerifier: true,
+			want: []string{"launcher install", "launcher setup"},
 		},
 		{
 			name: "generated bootstrap requires GitHub CLI before downloading", bootstrap: true, noGH: true, wantError: true,
@@ -227,16 +269,16 @@ func TestInstaller(t *testing.T) {
 			absent: []string{"omarchy", "curl --", "launcher install"},
 		},
 		{
-			name: "missing verifier stops piped installation before changes", piped: true, noVerifier: true, wantError: true,
-			absent: []string{"omarchy", "curl ", "git ", "make ", "launcher "},
+			name: "release installation needs no external MSI verifier", piped: true, noVerifier: true,
+			want: []string{"launcher install", "launcher setup"},
 		},
 		{
-			name: "missing verifier stops local installation before changes", local: true, noVerifier: true, wantError: true,
-			absent: []string{"omarchy", "curl ", "git ", "make ", "launcher "},
+			name: "local installation needs no external MSI verifier", local: true, noVerifier: true,
+			want: []string{"launcher install", "launcher setup"},
 		},
 		{
-			name: "missing verifier stops launcher-only installation before changes", args: []string{"--launcher-only"}, noVerifier: true, wantError: true,
-			absent: []string{"omarchy", "curl ", "git ", "make ", "launcher "},
+			name: "launcher-only installation needs no external MSI verifier", args: []string{"--launcher-only"}, noVerifier: true,
+			want: []string{"launcher install"}, absent: []string{"launcher setup"},
 		},
 		{
 			name: "package failure stops installation", pkgFail: true, wantError: true,
@@ -264,7 +306,7 @@ func TestInstaller(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			// Keep host tools off the child PATH so a missing verifier cannot be
+			// Keep host tools off the child PATH so missing dependencies cannot be
 			// supplied by the workstation and package commands cannot reach it.
 			for _, name := range []string{"bash", "chmod", "cp", "dirname", "jq", "mkdir", "mktemp", "realpath", "rm", "sha256sum"} {
 				path, err := exec.LookPath(name)
@@ -289,6 +331,8 @@ exit 1
 			}
 			installScript := filepath.Join(root, "checkout/install.sh")
 			fixture(t, installScript, string(script), 0600)
+			quickPath := filepath.Join(root, "bootstrap.sh")
+			fixture(t, quickPath, string(quickScript), 0600)
 			installedPath := filepath.Join(home, ".local/bin/ptcgl-omarchy")
 			fixture(t, installedPath, "existing launcher\n", 0755)
 			if tt.local {
@@ -297,6 +341,19 @@ exit 1
 			}
 			fixture(t, filepath.Join(root, "launcher"), launcherFixture, 0755)
 			releaseFixtures(t, root, tt.downloadMode, string(script))
+			selectedRelease := releaseVersion
+			if tt.downloadMode == "api-old-release" {
+				selectedRelease = "v0.3.0"
+			}
+			fixture(t, filepath.Join(root, "api-release.json"), fmt.Sprintf(`{"tag_name":%q}`, selectedRelease), 0600)
+			objectType := "commit"
+			if tt.downloadMode == "api-annotated" {
+				objectType = "tag"
+			} else if tt.downloadMode == "api-invalid-ref" {
+				objectType = "tree"
+			}
+			fixture(t, filepath.Join(root, "api-ref.json"), fmt.Sprintf(`{"object":{"sha":%q,"type":%q}}`, releaseCommit, objectType), 0600)
+			fixture(t, filepath.Join(root, "api-tag.json"), fmt.Sprintf(`{"object":{"sha":%q,"type":"commit"}}`, releaseCommit), 0600)
 			downloadedInstaller := string(script)
 			if tt.downloadMode == "bootstrap-tampered" {
 				downloadedInstaller = "#!/bin/bash\nprintf 'unverified bootstrap ran\\n' >> \"$TEST_LOG\"\n"
@@ -323,6 +380,9 @@ done
 [[ $TEST_DOWNLOAD_MODE != notfound && $TEST_DOWNLOAD_MODE != network ]] || exit 22
 base="https://github.com/hucKOder/omarchy-ptcgl/releases/download/$TEST_RELEASE"
 case "$url" in
+  "https://api.github.com/repos/hucKOder/omarchy-ptcgl/releases/latest") cp "$TEST_FIXTURES/api-release.json" "$dest" ;;
+  "https://api.github.com/repos/hucKOder/omarchy-ptcgl/git/ref/tags/$TEST_RELEASE") cp "$TEST_FIXTURES/api-ref.json" "$dest" ;;
+  "https://api.github.com/repos/hucKOder/omarchy-ptcgl/git/tags/$TEST_SOURCE_COMMIT") cp "$TEST_FIXTURES/api-tag.json" "$dest" ;;
   "$base/install.sh") cp "$TEST_FIXTURES/downloaded-installer" "$dest" ;;
   "$base/release.json") cp "$TEST_FIXTURES/release.json" "$dest" ;;
   "$base/release.sigstore.json")
@@ -411,6 +471,12 @@ cp "$TEST_FIXTURES/launcher" "$2/build/ptcgl-omarchy"
 				cmd = exec.Command("bash")
 				cmd.Stdin = strings.NewReader(block)
 			}
+			if tt.quick {
+				if tt.discover {
+					args = tt.args
+				}
+				cmd = exec.Command("bash", append([]string{quickPath}, args...)...)
+			}
 			logPath := filepath.Join(root, "commands.log")
 			cmd.Env = append(os.Environ(),
 				"HOME="+home, "XDG_CONFIG_HOME="+config, "TMPDIR="+tmp,
@@ -428,11 +494,11 @@ cp "$TEST_FIXTURES/launcher" "$2/build/ptcgl-omarchy"
 			log, _ := os.ReadFile(logPath)
 			if !tt.local && !tt.wantError && !strings.Contains(strings.Join(tt.args, " "), "--help") {
 				verified := strings.Index(string(log), " --bundle ")
-				packages := strings.Index(string(log), "omarchy pkg add")
+				packages := strings.Index(string(log), "omarchy pkg add umu-launcher")
 				if verified < 0 || packages < 0 || verified > packages {
 					t.Errorf("release authentication did not precede package installation:\n%s", log)
 				}
-				if tt.bootstrap {
+				if tt.bootstrap || tt.quick {
 					installerAuth := strings.Index(string(log), "install.sh --bundle ")
 					metadataAuth := strings.Index(string(log), "release.json --bundle ")
 					if installerAuth < 0 || metadataAuth < installerAuth || metadataAuth > packages {
@@ -440,22 +506,23 @@ cp "$TEST_FIXTURES/launcher" "$2/build/ptcgl-omarchy"
 					}
 				}
 			}
-			for _, forbidden := range []string{"omarchy pkg aur", "forbidden ", "git clone", "releases/latest"} {
+			forbiddenCommands := []string{"omarchy pkg aur", "forbidden ", "git clone"}
+			if !tt.quick {
+				forbiddenCommands = append(forbiddenCommands, "releases/latest")
+			}
+			for _, forbidden := range forbiddenCommands {
 				if strings.Contains(string(log), forbidden) {
 					t.Errorf("unexpected package build/install command %q in:\n%s", forbidden, log)
 				}
 			}
 			if tt.wantError && !tt.pkgFail && !tt.setupFail {
-				for _, mutation := range []string{"omarchy ", "make -C", "launcher "} {
+				packageMutation := "omarchy "
+				if tt.quick {
+					packageMutation = "omarchy pkg add umu-launcher"
+				}
+				for _, mutation := range []string{packageMutation, "make -C", "launcher "} {
 					if strings.Contains(string(log), mutation) {
 						t.Errorf("preflight/authentication failure allowed %q in:\n%s", mutation, log)
-					}
-				}
-			}
-			if tt.noVerifier && tt.wantError {
-				for _, want := range []string{"osslsigncode is required", "docs/AUR-DEPENDENCIES.md"} {
-					if !strings.Contains(string(output), want) {
-						t.Errorf("missing prerequisite guidance %q in:\n%s", want, output)
 					}
 				}
 			}

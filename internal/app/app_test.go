@@ -213,24 +213,6 @@ func TestExtractProtonHandlesLinksWithoutFollowingThem(t *testing.T) {
 	}
 }
 
-const goodSignature = "Signer's certificate:\n--------------------\nSigner #0:\nSubject: C=US,O=The Pokemon Company International\\, Inc.,CN=The Pokemon Company International\\, Inc.\nSignature verification: ok\nSucceeded\n"
-
-func TestInstallerMustHavePrimaryPokemonSigner(t *testing.T) {
-	if err := validatePublisher([]byte(goodSignature)); err != nil {
-		t.Fatal(err)
-	}
-	for _, bad := range []string{
-		strings.ReplaceAll(goodSignature, "O=The Pokemon Company International\\, Inc.", "O=Other Publisher"),
-		"Issuer: CN=The Pokemon Company International\\, Inc.\nSignature verification: ok\nSucceeded",
-		strings.ReplaceAll(goodSignature, "CN=The Pokemon Company International\\, Inc.", "CN=The Pokemon Company International\\, Inc. Evil"),
-		strings.ReplaceAll(goodSignature, "Signature verification: ok", "Signature verification: failed"),
-	} {
-		if validatePublisher([]byte(bad)) == nil {
-			t.Fatal("accepted invalid primary publisher")
-		}
-	}
-}
-
 func TestGameUpdatesPreservePrefixAndAreIdempotent(t *testing.T) {
 	a, r := testApp(t)
 	readyRuntime(t, a)
@@ -242,12 +224,6 @@ func TestGameUpdatesPreservePrefixAndAreIdempotent(t *testing.T) {
 	defer server.Close()
 	a.Download = testDownloadClient(server)
 	a.Profile.InstallerURL = server.URL
-	r.output = func(c Command) ([]byte, error) {
-		if c.Name == "osslsigncode" {
-			return []byte(goodSignature), nil
-		}
-		return nil, nil
-	}
 	for _, op := range []struct {
 		repair, check bool
 		expected      int
@@ -294,7 +270,6 @@ func TestFailedInstallerDoesNotAdvanceReceipt(t *testing.T) {
 	defer server.Close()
 	a.Download = testDownloadClient(server)
 	a.Profile.InstallerURL = server.URL
-	r.output = func(Command) ([]byte, error) { return []byte(goodSignature), nil }
 	r.run = func(Command) error { return errors.New("installer crashed") }
 	if a.Update(context.Background(), false, false) == nil {
 		t.Fatal("installer failure was ignored")

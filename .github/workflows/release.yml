@@ -13,6 +13,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  vulnerabilities:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: stable
+          cache: false
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
   build:
     runs-on: ubuntu-latest
     outputs:
@@ -23,7 +34,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version-file: go.mod
+          go-version: stable
           cache: false
       - run: make check
       - run: make test
@@ -42,7 +53,7 @@ jobs:
           retention-days: 3
 
   publish:
-    needs: build
+    needs: [build, vulnerabilities]
     runs-on: ubuntu-latest
     permissions:
       contents: write

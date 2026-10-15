@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -74,11 +73,6 @@ func (a *App) vcReady() bool {
 }
 
 func (a *App) setup(ctx context.Context) error {
-	if !exists(a.gamePath()) {
-		if err := a.require("osslsigncode"); err != nil {
-			return err
-		}
-	}
 	if err := a.bootstrap(ctx); err != nil {
 		return err
 	}
@@ -127,7 +121,7 @@ func (a *App) update(ctx context.Context, repair, checkOnly bool) (installerOutc
 		if !exists(a.gamePath()) && !repair {
 			return fmt.Errorf("game is not installed; run ptcgl-omarchy setup first")
 		}
-		if err := a.require("umu-run", "osslsigncode"); err != nil {
+		if err := a.require("umu-run"); err != nil {
 			return err
 		}
 		if !checkOnly {
@@ -206,43 +200,6 @@ func (a *App) install(ctx context.Context, operation string) (installerOutcome, 
 
 func windowsPath(path string) string { return "Z:" + strings.ReplaceAll(path, "/", `\`) }
 
-var signerSubject = regexp.MustCompile(`(?m)^Signer's certificate:\s*\n\s*-+\s*\n\s*Signer #0:\s*\n\s*Subject:\s*(.+)$`)
-
-func validatePublisher(output []byte) error {
-	text := string(output)
-	if !strings.Contains(text, "Signature verification: ok") || !strings.Contains(text, "Succeeded") {
-		return fmt.Errorf("installer signature verification failed")
-	}
-	match := signerSubject.FindStringSubmatch(text)
-	if len(match) != 2 {
-		return fmt.Errorf("installer publisher identity is missing")
-	}
-	// Split only unescaped commas in the primary signer's distinguished name.
-	var fields []string
-	start, escaped := 0, false
-	for i, r := range match[1] {
-		if r == ',' && !escaped {
-			fields = append(fields, strings.TrimSpace(match[1][start:i]))
-			start = i + 1
-		}
-		if r == '\\' {
-			escaped = !escaped
-		} else {
-			escaped = false
-		}
-	}
-	fields = append(fields, strings.TrimSpace(match[1][start:]))
-	cn, org := false, false
-	for _, field := range fields {
-		cn = cn || field == `CN=The Pokemon Company International\, Inc.`
-		org = org || field == `O=The Pokemon Company International\, Inc.`
-	}
-	if !cn || !org {
-		return fmt.Errorf("installer is not signed by Pokémon's publisher")
-	}
-	return nil
-}
-
 func (a *App) verifyInstaller(ctx context.Context, path string) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -255,9 +212,15 @@ func (a *App) verifyInstaller(ctx context.Context, path string) error {
 	}
 	verifyCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	output, err := a.Runner.Output(verifyCtx, Command{Name: "osslsigncode", Args: []string{"verify", "-in", path}})
+	self, err := os.Executable()
 	if err != nil {
-		return fmt.Errorf("installer signature or certificate verification failed")
+		return fmt.Errorf("locate built-in installer verifier: %w", err)
 	}
-	return validatePublisher(output)
+	// Keep parsing in a child process so cancellation and the deadline can stop
+	// verification even if a malformed compound document stalls the parser.
+	_, err = a.Runner.Output(verifyCtx, Command{Name: self, Args: []string{"__verify-installer", path}})
+	if err != nil {
+		return fmt.Errorf("installer signature, certificate, or publisher verification failed")
+	}
+	return nil
 }

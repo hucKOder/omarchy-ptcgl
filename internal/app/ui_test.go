@@ -64,7 +64,6 @@ func maintenanceApp(t *testing.T) (*App, *fakeRunner, string) {
 	t.Cleanup(server.Close)
 	a.Download = testDownloadClient(server)
 	a.Profile.InstallerURL = server.URL
-	r.output = func(Command) ([]byte, error) { return []byte(goodSignature), nil }
 	return a, r, fmt.Sprintf("%x", sha256.Sum256(body))
 }
 
