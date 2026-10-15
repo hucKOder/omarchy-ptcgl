@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 )
 
-var Version = "0.2.0"
+var Version = "0.3.0"
 
 type App struct {
 	Paths    Paths

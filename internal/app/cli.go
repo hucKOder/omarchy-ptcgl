@@ -6,11 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os/exec"
 	"strings"
-	"time"
 )
-
-const dialogTimeout = 5 * time.Minute
 
 const help = `ptcgl-omarchy — Pokémon TCG Live for Omarchy
 
@@ -24,11 +22,13 @@ Usage: ptcgl-omarchy <command> [options]
   runtime-update     Select the compatibility profile bundled with this release
   install            Install this binary and Omarchy integration for your user
   integrate          Register app menu, login callback, and tiled window rules
-  doctor [--json]    Check runtime, installation, and desktop integration
+  doctor [--json]     Check runtime, installation, and desktop integration
+  open <folder>       Open game, config, or cache in your file manager
+  open --gui          Choose a folder graphically
   uninstall          Remove binary and integration; retain installed game data
   version            Print launcher version
 
-setup, update, repair, runtime-update, and doctor accept --gui.
+setup, update, repair, runtime-update, doctor, and open accept --gui.
 Game patches run through the built-in updater at launch. update --check compares
 the official MSI with the last applied MSI; it does not check in-game patches.
 `
@@ -46,41 +46,21 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 		fmt.Fprintf(out, "%s %s\n", Name, Version)
 		return 0
 	}
-	p, err := UserPaths()
-	if err != nil {
-		fmt.Fprintln(errOut, err)
-		return 1
-	}
-	a, err := New(p, out, errOut)
-	if err != nil {
-		fmt.Fprintln(errOut, err)
-		return 1
-	}
-	// Callback URLs bypass flag parsing, preventing flag's error output from
-	// accidentally repeating an authentication URL.
-	if command == "callback" {
-		if len(args) != 1 {
-			fmt.Fprintln(errOut, ErrCallback)
-			return 1
-		}
-		if err := a.Callback(ctx, args[0]); err != nil {
-			fmt.Fprintln(errOut, err)
-			return 1
-		}
-		return 0
-	}
 	fs := flag.NewFlagSet(command, flag.ContinueOnError)
 	fs.SetOutput(errOut)
-	gui := fs.Bool("gui", false, "show progress or diagnostics dialog")
+	gui := fs.Bool("gui", false, "show graphical dialogs")
 	checkOnly := fs.Bool("check", false, "compare the latest official installer without applying it")
 	jsonOutput := fs.Bool("json", false, "print structured diagnostics")
-	if err := fs.Parse(args); err != nil {
-		if err == flag.ErrHelp {
-			return 0
+	// Never send callback URLs through flag parsing or its error output.
+	if command != "callback" {
+		if err := fs.Parse(args); err != nil {
+			if err == flag.ErrHelp {
+				return 0
+			}
+			return 2
 		}
-		return 2
 	}
-	if command != "play" && len(fs.Args()) > 0 {
+	if command != "play" && command != "open" && len(fs.Args()) > 0 {
 		fmt.Fprintln(errOut, "unexpected positional arguments")
 		return 2
 	}
@@ -92,6 +72,31 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "--json is only valid with doctor")
 		return 2
 	}
+	reportError := func(err error) int {
+		message := strings.TrimSpace(err.Error())
+		fmt.Fprintln(errOut, message)
+		if *gui || command == "app" {
+			ShowError(message)
+		}
+		return 1
+	}
+	if command == "callback" && len(args) != 1 {
+		return reportError(ErrCallback)
+	}
+	p, err := UserPaths()
+	if err != nil {
+		return reportError(err)
+	}
+	var a *App
+	if command == "open" {
+		// Folder access also works when configuration/runtime state needs repair.
+		a = &App{Paths: p, Runner: OSRunner{out, errOut}, LookPath: exec.LookPath}
+	} else {
+		a, err = New(p, out, errOut)
+		if err != nil {
+			return reportError(err)
+		}
+	}
 	operation := func(fn func(context.Context) error) error {
 		if *gui {
 			return a.WithProgress(ctx, fn)
@@ -99,16 +104,21 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 		return fn(ctx)
 	}
 	switch command {
+	case "callback":
+		err = a.Callback(ctx, args[0])
 	case "setup":
 		err = operation(a.Setup)
 	case "play":
 		err = a.Play(ctx, fs.Args())
 	case "app":
 		err = a.Desktop(ctx)
-	case "update":
-		err = operation(func(ctx context.Context) error { return a.Update(ctx, false, *checkOnly) })
-	case "repair":
-		err = operation(func(ctx context.Context) error { return a.Update(ctx, true, false) })
+	case "update", "repair":
+		repair := command == "repair"
+		if *gui {
+			err = a.UpdateGUI(ctx, repair, *checkOnly)
+		} else {
+			err = a.Update(ctx, repair, *checkOnly)
+		}
 	case "runtime-update":
 		err = operation(a.UpdateRuntime)
 	case "install":
@@ -117,6 +127,16 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 		err = a.Integrate(ctx)
 	case "uninstall":
 		err = a.Uninstall(ctx)
+	case "open":
+		if len(fs.Args()) > 1 || (len(fs.Args()) == 0 && !*gui) {
+			fmt.Fprintln(errOut, "usage: ptcgl-omarchy open <game|config|cache> or ptcgl-omarchy open --gui")
+			return 2
+		}
+		if len(fs.Args()) == 0 {
+			err = a.ChooseFolder(ctx)
+		} else {
+			err = a.OpenFolder(ctx, fs.Arg(0))
+		}
 	case "doctor":
 		checks := a.Doctor(ctx)
 		if *gui {
@@ -141,12 +161,7 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 		return 2
 	}
 	if err != nil {
-		message := strings.TrimSpace(err.Error())
-		fmt.Fprintln(errOut, message)
-		if *gui || command == "app" {
-			ShowError(message)
-		}
-		return 1
+		return reportError(err)
 	}
 	return 0
 }

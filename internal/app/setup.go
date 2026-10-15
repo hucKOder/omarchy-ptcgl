@@ -86,7 +86,8 @@ func (a *App) setup(ctx context.Context) error {
 		a.progress("Game is installed. Normal patches are handled by the game's updater.")
 		return nil
 	}
-	return a.install(ctx, "setup")
+	_, err := a.install(ctx, "setup")
+	return err
 }
 
 type Installation struct {
@@ -107,7 +108,22 @@ func (a *App) installation() Installation {
 // It does not update Proton or reset the prefix. Same-MSI updates are no-ops;
 // repair explicitly reinstalls files even when the MSI hash is unchanged.
 func (a *App) Update(ctx context.Context, repair, checkOnly bool) error {
-	return a.withLock(func() error {
+	_, err := a.update(ctx, repair, checkOnly)
+	return err
+}
+
+type installerOutcome int
+
+const (
+	installerUnchanged installerOutcome = iota + 1
+	installerAvailable
+	installerApplied
+	installerRepaired
+)
+
+func (a *App) update(ctx context.Context, repair, checkOnly bool) (installerOutcome, error) {
+	var outcome installerOutcome
+	err := a.withLock(func() error {
 		if !exists(a.gamePath()) && !repair {
 			return fmt.Errorf("game is not installed; run ptcgl-omarchy setup first")
 		}
@@ -126,33 +142,38 @@ func (a *App) Update(ctx context.Context, repair, checkOnly bool) error {
 		if checkOnly {
 			op = "check"
 		}
-		return a.install(ctx, op)
+		var err error
+		outcome, err = a.install(ctx, op)
+		return err
 	})
+	return outcome, err
 }
 
-func (a *App) install(ctx context.Context, operation string) error {
+func (a *App) install(ctx context.Context, operation string) (installerOutcome, error) {
 	a.progress("Downloading the current official Pokémon installer…")
 	installer := filepath.Join(a.Paths.Cache, "PokemonTCGLiveInstaller.msi")
 	if err := a.Download.Download(ctx, a.Profile.InstallerURL, installer, 1<<30,
 		func(path string) error { return a.verifyInstaller(ctx, path) }); err != nil {
-		return err
+		return 0, err
 	}
 	hash, err := fileSHA256(installer)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if operation == "check" {
+		outcome := installerAvailable
 		if hash == a.installation().InstallerSHA256 {
 			a.progress("The official installer matches the last applied installer.")
+			outcome = installerUnchanged
 		} else {
 			a.progress("The official installer differs from the last applied installer. Run ptcgl-omarchy update to apply it.")
 		}
 		a.progress("In-game patches are checked by the game at launch.")
-		return nil
+		return outcome, nil
 	}
 	if operation == "update" && hash == a.installation().InstallerSHA256 && exists(a.gamePath()) {
 		a.progress("The official installer has not changed. Launch the game to apply in-game patches.")
-		return nil
+		return installerUnchanged, nil
 	}
 	a.progress("Applying Pokémon TCG Live installer (" + operation + ")…")
 	msiexec := filepath.Join(a.Paths.Prefix, "drive_c/windows/system32/msiexec.exe")
@@ -166,18 +187,21 @@ func (a *App) install(ctx context.Context, operation string) error {
 		var exit *exec.ExitError
 		// Wine exposes Windows success-with-reboot-required as its low byte.
 		if !errors.As(err, &exit) || (exit.ExitCode() != 194 && exit.ExitCode() != 3010) {
-			return fmt.Errorf("installer failed; retry %s or run doctor: %w", operation, err)
+			return 0, fmt.Errorf("installer failed; retry %s or run doctor: %w", operation, err)
 		}
 	}
 	if !exists(a.gamePath()) {
-		return fmt.Errorf("installer completed without producing the game executable")
+		return 0, fmt.Errorf("installer completed without producing the game executable")
 	}
 	state := Installation{hash, time.Now().UTC(), operation, a.Profile.ProtonRelease}
 	if err := writeJSON(filepath.Join(a.Paths.State, "installation.json"), state); err != nil {
-		return err
+		return 0, err
 	}
 	a.progress("Game installation complete. Launch it to finish any in-game updates.")
-	return nil
+	if operation == "repair" {
+		return installerRepaired, nil
+	}
+	return installerApplied, nil
 }
 
 func windowsPath(path string) string { return "Z:" + strings.ReplaceAll(path, "/", `\`) }

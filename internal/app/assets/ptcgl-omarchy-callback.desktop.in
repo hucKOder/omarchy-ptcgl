@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Pokémon TCG Live authentication
+Exec=@EXEC@ callback %u
+NoDisplay=true
+Terminal=false
+MimeType=x-scheme-handler/tpcitcgapp;

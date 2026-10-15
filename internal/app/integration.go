@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -15,6 +16,12 @@ const callbackID = "ptcgl-omarchy-callback.desktop"
 const callbackMIME = "x-scheme-handler/tpcitcgapp"
 const blockBegin = "-- BEGIN ptcgl-omarchy"
 const blockEnd = "-- END ptcgl-omarchy"
+
+//go:embed assets/ptcgl-omarchy.desktop.in
+var desktopTemplate string
+
+//go:embed assets/ptcgl-omarchy-callback.desktop.in
+var callbackTemplate string
 
 type Integration struct {
 	PreviousHandler string `json:"previous_handler"`
@@ -66,8 +73,8 @@ func removeBlock(source string) (string, error) {
 func (a *App) desktopFiles() map[string][]byte {
 	exe := desktopQuote(a.Paths.Bin)
 	return map[string][]byte{
-		desktopID:  []byte("[Desktop Entry]\nType=Application\nName=Pokémon TCG Live (Omarchy)\nComment=Play Pokémon TCG Live in a tiled Hyprland window\nExec=" + exe + " app\nIcon=ptcgl-omarchy\nTerminal=false\nCategories=Game;CardGame;\nStartupNotify=false\nActions=Update;Doctor;\n\n[Desktop Action Update]\nName=Update game\nExec=" + exe + " update --gui\n\n[Desktop Action Doctor]\nName=Diagnostics\nExec=" + exe + " doctor --gui\n"),
-		callbackID: []byte("[Desktop Entry]\nType=Application\nName=Pokémon TCG Live authentication\nExec=" + exe + " callback %u\nNoDisplay=true\nTerminal=false\nMimeType=" + callbackMIME + ";\n"),
+		desktopID:  []byte(strings.ReplaceAll(desktopTemplate, "@EXEC@", exe)),
+		callbackID: []byte(strings.ReplaceAll(callbackTemplate, "@EXEC@", exe)),
 	}
 }
 

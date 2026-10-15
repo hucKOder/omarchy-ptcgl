@@ -6,6 +6,118 @@ A standalone Go repository for installing and launching Pokémon TCG Live on
 Omarchy, with app-menu launch, browser authentication, and a tiled Hyprland
 window. Use the official Windows client through UMU, GE-Proton, and XWayland.
 
+## Current status and next work
+
+Build steps 1–4 below are implemented. Real-machine setup, browser callback
+delivery, tiled startup, resizing, and repeat-launch focus are recorded in
+[the validation record](VALIDATION.md).
+
+- [x] Actionable diagnostics: `doctor` explains failures and suggests recovery
+  commands in terminal/GUI reports and an optional `fix` field in JSON. Check
+  the callback desktop file as well as its MIME registration, and preserve
+  command errors. Automated regression coverage added on 2026-10-15.
+- [x] Online-play acceptance: the user confirmed multiple completed online
+  sessions without issues on 2026-10-15; see the validation record.
+- [x] Recorded desktop acceptance on 2026-10-15: workspace movement and the
+  compositor fullscreen operation used by Omarchy's binding, alongside resize,
+  repeat launch, maintenance blocking, and a successful post-repair launch.
+- [ ] Record a real changed-MSI upgrade when a newer official installer is
+  available, including preservation of existing settings.
+- [ ] Smoke-test the next tagged release's published downloads and attestations
+  using the [verified release procedure](RELEASES.md#verified-release-installation).
+
+## Installation follow-up
+
+Installation simplification takes priority over the remaining launcher QoL work.
+See [the installation plan](INSTALLATION-PLAN.md) for dependencies, implementation
+tasks, and release acceptance criteria:
+
+1. Resolve a supported package route for `osslsigncode`.
+2. Generate one complete release-specific installation procedure, with no manual
+   version/commit transcription or apparent second installation step.
+3. Improve prerequisite checks and failure messages.
+4. Add understandable setup progress and reliable, stage-specific recovery.
+5. Validate the published procedure on clean Omarchy with a first-time tester.
+
+The verifier's package channel is an open dependency. Documentation and release
+automation can proceed while it is investigated; simple-install acceptance needs
+the supported provisioning route.
+
+Release-specific instruction generation, ready-to-run v0.2.0 instructions, and
+early GitHub CLI capability checks are implemented and covered by isolated tests.
+The package investigation confirmed `osslsigncode` is absent from the checked
+Arch/Omarchy binary channels; upstream packaging, setup progress/recovery, and
+published-release acceptance remain open.
+
+The local candidate was independently reviewed, review findings were fixed, and
+real desktop/maintenance checks passed on 2026-10-15. See the validation record
+for the tested development version, binary hash, and acceptance scope.
+
+A subsequent isolated fresh-app installation also passed runtime/prefix/game
+provisioning and first browser sign-in. The initial cross-profile callback-routing
+mistake was corrected in the test harness, and the normal installation was
+restored and checksum-verified afterward. Clean-OS dependency provisioning is
+still a separate acceptance task.
+
+## QoL roadmap
+
+Prioritized on 2026-10-15, following successful online-play acceptance. Effort
+estimates are relative: **small** is a focused change using existing operations;
+**medium** involves coordinating UI and process/download state.
+
+### 1. App-menu maintenance actions and clear results — completed 2026-10-15
+
+- [x] Add **Check installer updates** and **Repair game** desktop actions, using
+  the existing `update --check --gui` and `repair --gui` commands.
+- Show a result dialog after graphical maintenance: installer unchanged, newer
+  installer available, update applied, or repair completed. Game patches continue
+  to be checked by the game at launch.
+- Use operation-specific titles and progress text for checking, updating, and
+  repairing.
+- Completion: each outcome is understandable without a terminal; failures and
+  running-session conflicts remain visible; integration refreshes the actions
+  consistently. Verify changed/unchanged installer outcomes and GUI result routing.
+- Verified with isolated installer/Zenity fixtures for result dialogs, failures,
+  busy sessions, and repeated desktop integration.
+
+### 2. Real download progress — medium
+
+Included in the installation plan's setup-progress work.
+
+- [ ] Show downloaded/total MiB, percentage, and transfer speed for MSI and Proton
+  downloads. Use indeterminate progress when the server omits the total size.
+- Show distinct downloading, verifying, extracting, and installing phases.
+- Allow cancellation during downloads, with temporary-file cleanup and a usable
+  retry. Cancellation availability follows the operation phase.
+- Completion: known/unknown-length downloads and cancellation report accurately;
+  interrupted transfers preserve the existing verified cache.
+
+### 3. Smoother startup and repeat launch — medium
+
+- [ ] Show brief **Starting Pokémon TCG Live…** feedback until the owned game
+  window appears, then dismiss it without taking focus from the game.
+- A second launch during startup waits briefly for the same session's window and
+  focuses it. Report setup/maintenance contention separately from game startup.
+- Completion: slow startup and rapid repeated launches produce one game session,
+  useful feedback, and correct focus; failed startup clears the indicator.
+
+### 4. Open game and configuration folders — completed 2026-10-15
+
+- [x] Add a folder-opening command and an app-menu **Open folders** chooser for
+  the game installation, launcher configuration, and download cache.
+- Resolve paths from the active XDG configuration and explain missing folders.
+- Completion: folders open in the default file manager, including paths with
+  spaces or Unicode and custom XDG locations.
+- Verified with isolated chooser/opener fixtures, including cancellation,
+  missing folders, custom XDG paths, active sessions, and broken configuration.
+
+### 5. Shareable diagnostics summary — small
+
+- [ ] Add launcher/runtime versions and the last applied installer date to the
+  diagnostics report, plus a **Save report** action in the graphical view.
+- Completion: one readable report contains version/context details and actionable
+  checks; saving or cancelling the save dialog behaves predictably.
+
 ## Build sequence
 
 1. Implement the CLI, XDG paths, isolated prefix, runtime provisioning, official

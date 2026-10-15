@@ -1,5 +1,5 @@
 GO ?= go
-VERSION ?= 0.2.0
+VERSION ?= 0.3.0
 
 .PHONY: build test check install install-launcher uninstall clean
 build:

@@ -91,9 +91,13 @@ jobs:
               --signer-digest "$GITHUB_SHA" --deny-self-hosted-runners \
               --predicate-type https://slsa.dev/provenance/v1
           done
-          printf 'Release: %s\nSource commit: %s\n\nVerify install.sh before running it; see docs/RELEASES.md at this commit.\n' \
-            "$GITHUB_REF_NAME" "$GITHUB_SHA" > release/notes.md
+          test -s release/notes.md
+          release_options=()
+          if [[ $GITHUB_REF_NAME == *-* ]]; then
+            release_options+=(--prerelease --latest=false)
+          fi
           gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
             --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes-file release/notes.md \
+            "${release_options[@]}" \
             release/install.sh release/release.json release/release.sigstore.json \
             release/ptcgl-omarchy-linux-amd64

@@ -1,0 +1,93 @@
+Release: **@RELEASE@**
+Source commit: `@SOURCE_COMMIT@`
+
+## Highlights
+
+- Complete release-pinned installation instructions with early prerequisite checks.
+- Desktop actions for checking installer updates, repairing the game, and opening
+  game/configuration/cache folders.
+- Clear graphical results for installer checks, updates, and repairs.
+- Actionable `doctor` guidance in terminal, GUI, and JSON reports, plus visible
+  graphical errors when configuration cannot be loaded.
+- Readable embedded desktop templates and correct prerelease classification.
+
+## Install
+
+Requires x86-64 Omarchy, its Lua Hyprland configuration (Hyprland 0.55+),
+working XWayland/Vulkan, and roughly 8 GB of free space. Close the game before
+installing or upgrading the launcher.
+
+1. Install the bootstrap tools with `omarchy pkg add github-cli curl jq coreutils`.
+   GitHub CLI 2.102.0 is tested; the block below checks the required verification
+   capabilities. No GitHub login is required for bundle-based verification.
+2. Make sure `osslsigncode` is available using
+   [the verifier provisioning guide](https://github.com/hucKOder/omarchy-ptcgl/blob/@SOURCE_COMMIT@/docs/AUR-DEPENDENCIES.md).
+   It is still a separately provisioned prerequisite, including for launcher-only
+   upgrades.
+3. Copy the **entire block** below into Bash as your regular desktop user. The
+   release and source commit are already selected. This block verifies the
+   downloaded installer **before executing it**, then installs the launcher and
+   game. There is no second installer command to run afterward.
+
+```bash
+(
+  set -euo pipefail
+  release='@RELEASE@'
+  source_commit='@SOURCE_COMMIT@'
+  repository='hucKOder/omarchy-ptcgl'
+  fail() { printf 'Error: %s\n' "$*" >&2; exit 1; }
+  (( EUID != 0 )) || fail 'Run as your desktop user, without sudo.'
+  [[ $(uname -s) == Linux && $(uname -m) == x86_64 ]] || fail 'x86-64 Linux is required.'
+  command -v omarchy >/dev/null || fail 'Run this on Omarchy.'
+  [[ -z ${XDG_CONFIG_HOME:-} || $XDG_CONFIG_HOME == /* ]] || fail 'XDG_CONFIG_HOME must be an absolute path.'
+  [[ -f ${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.lua ]] || fail 'Omarchy Lua Hyprland configuration is required (Hyprland 0.55+).'
+  for tool in curl jq gh sha256sum; do
+    command -v "$tool" >/dev/null || fail "Missing $tool. Run: omarchy pkg add github-cli curl jq coreutils"
+  done
+  command -v osslsigncode >/dev/null || fail "osslsigncode is required. See https://github.com/$repository/blob/$source_commit/docs/AUR-DEPENDENCIES.md"
+  verify_help=$(gh attestation verify --help) || fail 'Update github-cli to a version supporting artifact attestations.'
+  for option in --bundle --hostname --repo --cert-identity --cert-oidc-issuer --source-ref --source-digest --signer-digest --deny-self-hosted-runners --predicate-type; do
+    [[ $verify_help == *"$option"* ]] || fail "GitHub CLI is missing $option. Update github-cli through Omarchy, then retry this block."
+  done
+  work_dir=$(mktemp -d)
+  trap 'rm -rf -- "$work_dir"' EXIT
+  base="https://github.com/$repository/releases/download/$release"
+  printf 'Verifying installer for %s\nSource commit: %s\n' "$release" "$source_commit"
+  for asset in install.sh release.sigstore.json; do
+    curl --proto '=https' --proto-redir '=https' -fsSL --retry 3 \
+      "$base/$asset" --output "$work_dir/$asset" || fail 'Download failed. Retry this block; installation has not started.'
+  done
+  gh attestation verify "$work_dir/install.sh" \
+    --bundle "$work_dir/release.sigstore.json" --hostname github.com \
+    --repo "$repository" \
+    --cert-identity "https://github.com/$repository/.github/workflows/release.yml@refs/tags/$release" \
+    --cert-oidc-issuer https://token.actions.githubusercontent.com \
+    --source-ref "refs/tags/$release" --source-digest "$source_commit" \
+    --signer-digest "$source_commit" --deny-self-hosted-runners \
+    --predicate-type https://slsa.dev/provenance/v1 || fail 'Installer authentication failed; installation has not started.'
+  bash "$work_dir/install.sh" --release "$release" --source-commit "$source_commit"
+)
+```
+
+Omarchy requests your sudo password for system packages. Proton and the official
+game are downloaded during setup. When **Installed!** appears, open **Pokémon TCG
+Live (Omarchy)** from the app menu and sign in through your browser.
+
+### Launcher-only installation or upgrade
+
+Add `--launcher-only` to the final `bash` command in the block above. It uses the
+same verified release while leaving game setup for the first launch and retaining
+the existing game prefix and selected Proton profile.
+
+### If setup fails
+
+- Before launcher installation: fix the reported prerequisite or verification
+  problem and retry the block.
+- After launcher installation, interrupted downloads/setup: run
+  `ptcgl-omarchy setup` to retry.
+- If Windows Installer failed or was interrupted: close the game and run
+  `ptcgl-omarchy repair`.
+
+For diagnostics, use `ptcgl-omarchy doctor`. See
+[the update and recovery guide](https://github.com/hucKOder/omarchy-ptcgl/blob/@SOURCE_COMMIT@/docs/UPDATES.md)
+for details.

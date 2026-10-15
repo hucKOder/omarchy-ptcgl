@@ -134,6 +134,7 @@ func TestInstaller(t *testing.T) {
 		bootstrap            bool
 		noConfig, noVerifier bool
 		noSelection, noGH    bool
+		oldGH                bool
 		pkgFail, setupFail   bool
 		wantError            bool
 		want, absent         []string
@@ -144,12 +145,35 @@ func TestInstaller(t *testing.T) {
 			absent: []string{"omarchy pkg add make go", "git clone", "make -C"},
 		},
 		{
-			name: "documented bootstrap verifies installer before execution", bootstrap: true,
+			name: "generated bootstrap verifies installer before execution", bootstrap: true,
 			want: []string{"gh attestation verify", "launcher install", "launcher setup"},
 		},
 		{
 			name: "tampered bootstrap installer never executes", bootstrap: true, downloadMode: "bootstrap-tampered", wantError: true,
 			absent: []string{"unverified bootstrap ran", "omarchy ", "launcher install"},
+		},
+		{
+			name: "generated bootstrap launcher upgrade", bootstrap: true, args: []string{"--launcher-only"},
+			want: []string{"launcher install"}, absent: []string{"launcher setup"},
+		},
+		{
+			name: "generated bootstrap rejects wrong source commit", bootstrap: true, downloadMode: "wrong-commit", wantError: true,
+		},
+		{
+			name: "generated bootstrap requires verifier before downloading", bootstrap: true, noVerifier: true, wantError: true,
+			absent: []string{"curl ", "gh "},
+		},
+		{
+			name: "generated bootstrap requires GitHub CLI before downloading", bootstrap: true, noGH: true, wantError: true,
+			absent: []string{"curl "},
+		},
+		{
+			name: "old GitHub CLI stops before downloading", oldGH: true, wantError: true,
+			absent: []string{"curl "},
+		},
+		{
+			name: "generated bootstrap checks GitHub CLI capabilities", bootstrap: true, oldGH: true, wantError: true,
+			absent: []string{"curl "},
 		},
 		{
 			name: "launcher only", args: []string{"--launcher-only"},
@@ -315,6 +339,14 @@ set -euo pipefail
 printf 'gh %s\n' "$*" >> "$TEST_LOG"
 [[ $1 == attestation && $2 == verify ]]
 shift 2
+if [[ ${1:-} == --help ]]; then
+  if [[ $TEST_OLD_GH == 1 ]]; then
+    printf '%s\n' '--bundle --repo'
+  else
+    printf '%s\n' '--bundle --hostname --repo --cert-identity --cert-oidc-issuer --source-ref --source-digest --signer-digest --deny-self-hosted-runners --predicate-type'
+  fi
+  exit 0
+fi
 artifact=$1
 shift
 declare -A policy=()
@@ -371,20 +403,11 @@ cp "$TEST_FIXTURES/launcher" "$2/build/ptcgl-omarchy"
 				cmd.Stdin = strings.NewReader(string(script))
 			}
 			if tt.bootstrap {
-				doc, err := os.ReadFile("../../docs/RELEASES.md")
-				if err != nil {
-					t.Fatal(err)
+				block := installBlock(t, generatedNotes(t, releaseVersion, releaseCommit))
+				if len(tt.args) != 0 {
+					invocation := `bash "$work_dir/install.sh" --release "$release" --source-commit "$source_commit"`
+					block = strings.Replace(block, invocation, invocation+" "+strings.Join(tt.args, " "), 1)
 				}
-				_, block, ok := strings.Cut(string(doc), "```bash\n")
-				if !ok {
-					t.Fatal("verified bootstrap instructions are missing")
-				}
-				block, _, ok = strings.Cut(block, "\n```")
-				if !ok {
-					t.Fatal("verified bootstrap instructions are incomplete")
-				}
-				block = strings.ReplaceAll(block, "'vX.Y.Z'", "'"+releaseVersion+"'")
-				block = strings.ReplaceAll(block, "'FULL_40_HEX_COMMIT'", "'"+releaseCommit+"'")
 				cmd = exec.Command("bash")
 				cmd.Stdin = strings.NewReader(block)
 			}
@@ -396,6 +419,7 @@ cp "$TEST_FIXTURES/launcher" "$2/build/ptcgl-omarchy"
 				"TEST_RELEASE="+releaseVersion, "TEST_SOURCE_COMMIT="+releaseCommit,
 				fmt.Sprintf("TEST_PKG_FAIL=%d", boolInt(tt.pkgFail)),
 				fmt.Sprintf("TEST_SETUP_FAIL=%d", boolInt(tt.setupFail)),
+				fmt.Sprintf("TEST_OLD_GH=%d", boolInt(tt.oldGH)),
 			)
 			output, err := cmd.CombinedOutput()
 			if (err != nil) != tt.wantError {
@@ -403,10 +427,17 @@ cp "$TEST_FIXTURES/launcher" "$2/build/ptcgl-omarchy"
 			}
 			log, _ := os.ReadFile(logPath)
 			if !tt.local && !tt.wantError && !strings.Contains(strings.Join(tt.args, " "), "--help") {
-				verified := strings.Index(string(log), "gh attestation verify")
+				verified := strings.Index(string(log), " --bundle ")
 				packages := strings.Index(string(log), "omarchy pkg add")
 				if verified < 0 || packages < 0 || verified > packages {
 					t.Errorf("release authentication did not precede package installation:\n%s", log)
+				}
+				if tt.bootstrap {
+					installerAuth := strings.Index(string(log), "install.sh --bundle ")
+					metadataAuth := strings.Index(string(log), "release.json --bundle ")
+					if installerAuth < 0 || metadataAuth < installerAuth || metadataAuth > packages {
+						t.Errorf("bootstrap did not authenticate installer, then metadata, before installation:\n%s", log)
+					}
 				}
 			}
 			for _, forbidden := range []string{"omarchy pkg aur", "forbidden ", "git clone", "releases/latest"} {
@@ -427,6 +458,9 @@ cp "$TEST_FIXTURES/launcher" "$2/build/ptcgl-omarchy"
 						t.Errorf("missing prerequisite guidance %q in:\n%s", want, output)
 					}
 				}
+			}
+			if tt.oldGH && !strings.Contains(string(output), "Update github-cli") {
+				t.Errorf("old GitHub CLI has no recovery guidance: %s", output)
 			}
 			for _, want := range tt.want {
 				if !strings.Contains(string(log), want) {

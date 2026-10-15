@@ -1,0 +1,30 @@
+[Desktop Entry]
+Type=Application
+Name=Pokémon TCG Live (Omarchy)
+Comment=Play Pokémon TCG Live in a tiled Hyprland window
+Exec=@EXEC@ app
+Icon=ptcgl-omarchy
+Terminal=false
+Categories=Game;CardGame;
+StartupNotify=false
+Actions=CheckUpdate;Update;Repair;Folders;Doctor;
+
+[Desktop Action CheckUpdate]
+Name=Check installer updates
+Exec=@EXEC@ update --check --gui
+
+[Desktop Action Update]
+Name=Update game
+Exec=@EXEC@ update --gui
+
+[Desktop Action Repair]
+Name=Repair game
+Exec=@EXEC@ repair --gui
+
+[Desktop Action Folders]
+Name=Open folders
+Exec=@EXEC@ open --gui
+
+[Desktop Action Doctor]
+Name=Diagnostics
+Exec=@EXEC@ doctor --gui

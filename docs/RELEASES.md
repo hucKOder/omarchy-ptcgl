@@ -24,33 +24,57 @@ from an unverified downloaded manifest is not an independently established pin.
 
 ## Verified release installation
 
-Prerequisites: a recent `gh` supporting the verification flags below, `curl`,
-`jq`, `sha256sum`, and the separately provisioned
-[`osslsigncode`](AUR-DEPENDENCIES.md). Obtain these tools through your usual trusted
-package/tool workflow before starting. Using a downloaded bundle avoids requiring
-a GitHub login for verification; network access may still be needed for Sigstore
-trust metadata.
+For releases built from this checkout, use the complete **Install** block in the
+[selected release's notes](https://github.com/hucKOder/omarchy-ptcgl/releases).
+The workflow fills in its version and source commit; no manual substitution is
+needed. The block performs the full installation, including verification before
+the downloaded installer runs.
 
-Replace the two selection values below with the release and source commit you
-intend to trust. The placeholder values deliberately fail validation.
+Prepare bootstrap tools with `omarchy pkg add github-cli curl jq coreutils` and
+provision [`osslsigncode`](AUR-DEPENDENCIES.md) separately. GitHub CLI 2.102.0 is
+tested; required verification capabilities are checked before downloading.
+Bundle-based verification does not require a GitHub login. Network access may
+still be needed for Sigstore trust metadata.
 
-Run the following block in Bash. It downloads files without executing them,
-verifies `install.sh` itself, and only then runs it:
+### Existing v0.2.0 release
+
+The following block is ready to run for **v0.2.0**, whose
+[published announcement](https://github.com/hucKOder/omarchy-ptcgl/releases/tag/v0.2.0)
+and annotated tag identify source commit
+`5e3e96bff7a5bcff0b093dc64dc12538d813148e`. This provides complete instructions
+for that release without changing its existing artifacts. For another release,
+use that release's own installation block.
+
+Copy the entire block into Bash as your regular desktop user. It downloads the
+installer as data, verifies `install.sh`, and then runs the installation:
 
 ```bash
 (
   set -euo pipefail
-  release='vX.Y.Z'
-  source_commit='FULL_40_HEX_COMMIT'
-  [[ $release =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
-  [[ $source_commit =~ ^[0-9a-f]{40}$ ]]
+  release='v0.2.0'
+  source_commit='5e3e96bff7a5bcff0b093dc64dc12538d813148e'
   repository='hucKOder/omarchy-ptcgl'
+  fail() { printf 'Error: %s\n' "$*" >&2; exit 1; }
+  (( EUID != 0 )) || fail 'Run as your desktop user, without sudo.'
+  [[ $(uname -s) == Linux && $(uname -m) == x86_64 ]] || fail 'x86-64 Linux is required.'
+  command -v omarchy >/dev/null || fail 'Run this on Omarchy.'
+  [[ -z ${XDG_CONFIG_HOME:-} || $XDG_CONFIG_HOME == /* ]] || fail 'XDG_CONFIG_HOME must be an absolute path.'
+  [[ -f ${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.lua ]] || fail 'Omarchy Lua Hyprland configuration is required (Hyprland 0.55+).'
+  for tool in curl jq gh sha256sum; do
+    command -v "$tool" >/dev/null || fail "Missing $tool. Run: omarchy pkg add github-cli curl jq coreutils"
+  done
+  command -v osslsigncode >/dev/null || fail "osslsigncode is required. See https://github.com/$repository/blob/$source_commit/docs/AUR-DEPENDENCIES.md"
+  verify_help=$(gh attestation verify --help) || fail 'Update github-cli to a version supporting artifact attestations.'
+  for option in --bundle --hostname --repo --cert-identity --cert-oidc-issuer --source-ref --source-digest --signer-digest --deny-self-hosted-runners --predicate-type; do
+    [[ $verify_help == *"$option"* ]] || fail "GitHub CLI is missing $option. Update github-cli through Omarchy, then retry this block."
+  done
   work_dir=$(mktemp -d)
   trap 'rm -rf -- "$work_dir"' EXIT
   base="https://github.com/$repository/releases/download/$release"
+  printf 'Verifying installer for %s\nSource commit: %s\n' "$release" "$source_commit"
   for asset in install.sh release.sigstore.json; do
-    curl --proto '=https' --proto-redir '=https' -fsSL \
-      "$base/$asset" --output "$work_dir/$asset"
+    curl --proto '=https' --proto-redir '=https' -fsSL --retry 3 \
+      "$base/$asset" --output "$work_dir/$asset" || fail 'Download failed. Retry this block; installation has not started.'
   done
   gh attestation verify "$work_dir/install.sh" \
     --bundle "$work_dir/release.sigstore.json" --hostname github.com \
@@ -59,14 +83,15 @@ verifies `install.sh` itself, and only then runs it:
     --cert-oidc-issuer https://token.actions.githubusercontent.com \
     --source-ref "refs/tags/$release" --source-digest "$source_commit" \
     --signer-digest "$source_commit" --deny-self-hosted-runners \
-    --predicate-type https://slsa.dev/provenance/v1
+    --predicate-type https://slsa.dev/provenance/v1 || fail 'Installer authentication failed; installation has not started.'
   bash "$work_dir/install.sh" --release "$release" --source-commit "$source_commit"
 )
 ```
 
 For a launcher-only installation or upgrade, append `--launcher-only` to the final
-`bash` command. Rerun this procedure with a freshly verified installer for each
-selected release. Do not replace it with execution of `main/install.sh` through a
+`bash` command inside the block. Do not run a second installer command afterward.
+Rerun the selected release's complete procedure for each installation or upgrade.
+Do not replace it with execution of `main/install.sh` through a
 pipe: an installer cannot establish trust in its own code after it starts running.
 
 The installer authenticates `release.json` from the same release identity, checks
@@ -100,10 +125,12 @@ locations are fixed by the installer rather than supplied by that manifest.
    ready to publish. The tag must identify the reviewed commit; protect release
    tags and workflow changes using repository access controls.
 3. The read-only build job tests the source and builds the versioned launcher.
-   `scripts/release-assets.sh` packages it with the installer and manifest. The
+   `scripts/release-assets.sh` packages it with the installer, manifest, and
+   complete release-specific installation notes. The
    privileged publish job downloads these assets without executing project code,
    validates their hashes, generates attestations, and verifies them with the same
-   identity policy before publishing.
+   identity policy before publishing. It uses the generated notes as data and
+   does not execute project code to produce release instructions.
 4. Check the published assets and exercise the verified download/attestation steps
    against the new release before announcing it. Record the full source commit
    alongside the version in the announcement.

@@ -7,15 +7,22 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
+const dialogTimeout = 5 * time.Minute
+
 func (a *App) WithProgress(ctx context.Context, operation func(context.Context) error) error {
+	return a.withProgress(ctx, "Pokémon TCG Live", "Preparing Pokémon TCG Live…", operation)
+}
+
+func (a *App) withProgress(ctx context.Context, title, text string, operation func(context.Context) error) error {
 	if err := a.require("zenity"); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "zenity", "--progress", "--pulsate", "--auto-close", "--no-cancel", "--title=Pokémon TCG Live", "--text=Preparing Pokémon TCG Live…", "--width=480")
+	cmd := exec.CommandContext(ctx, "zenity", "--progress", "--pulsate", "--auto-close", "--no-cancel", "--title="+title, "--text="+text, "--width=480")
 	pipe, err := cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -37,7 +44,51 @@ func (a *App) WithProgress(ctx context.Context, operation func(context.Context) 
 	a.Notify = previous
 	_, _ = fmt.Fprintln(pipe, "100")
 	_ = pipe.Close()
-	<-finished
+	dialogErr := <-finished
+	if err != nil {
+		return err
+	}
+	if dialogErr != nil {
+		return fmt.Errorf("progress dialog closed: %w", dialogErr)
+	}
+	return ctx.Err()
+}
+
+func (a *App) UpdateGUI(ctx context.Context, repair, checkOnly bool) error {
+	title, text := "Update game", "Updating the official Pokémon installer…"
+	if repair {
+		title, text = "Repair game", "Repairing Pokémon TCG Live…"
+	}
+	if checkOnly {
+		title, text = "Check installer updates", "Checking the current official Pokémon installer…"
+	}
+	title = "Pokémon TCG Live — " + title
+	var outcome installerOutcome
+	if err := a.withProgress(ctx, title, text, func(ctx context.Context) error {
+		var err error
+		outcome, err = a.update(ctx, repair, checkOnly)
+		return err
+	}); err != nil {
+		return err
+	}
+	var message string
+	switch outcome {
+	case installerUnchanged:
+		message = "Official installer unchanged.\n\nThe current installer matches the last applied installer. No reinstall was needed."
+	case installerAvailable:
+		message = "Installer update available.\n\nThe current official installer differs from the last applied installer. Choose Update game from the app's desktop actions, or run ptcgl-omarchy update to apply it."
+	case installerApplied:
+		message = "Update completed.\n\nThe current official installer was applied successfully."
+	case installerRepaired:
+		message = "Repair completed.\n\nThe current official installer was reapplied successfully."
+	default:
+		return fmt.Errorf("maintenance completed without an installer result")
+	}
+	message += "\n\nIn-game patches are checked by the game at launch."
+	err := exec.CommandContext(ctx, "zenity", "--info", "--no-markup", "--title="+title, "--text="+message, "--width=500").Run()
+	if dialogDismissed(err) {
+		return nil
+	}
 	return err
 }
 
@@ -61,9 +112,14 @@ func ShowReport(ctx context.Context, report string) error {
 	cmd.Stdin = strings.NewReader(report)
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
-	var exit *exec.ExitError
-	if errors.As(err, &exit) && exit.ExitCode() == 1 {
+	if dialogDismissed(err) {
 		return nil
 	}
 	return err
+}
+
+// Zenity returns status 1 when a dialog is cancelled or closed.
+func dialogDismissed(err error) bool {
+	var exit *exec.ExitError
+	return errors.As(err, &exit) && exit.ExitCode() == 1
 }

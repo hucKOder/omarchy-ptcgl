@@ -12,11 +12,13 @@ API, or updater implementation is assumed by this project.
 
 ## Official MSI refresh
 
-`update --check` downloads the current official MSI, verifies its Authenticode
-signature and publisher, and compares its SHA-256 with the installation receipt.
+The optional `update --check` downloads the current official MSI, verifies its
+Authenticode signature and publisher, and compares its SHA-256 with the
+installation receipt.
 It does not invoke Windows Installer or check in-game patches.
 
-`update` performs the same download and verification. If the MSI changed, it
+You can run `update` directly; a separate check is not required. It performs the
+same download and verification. If the MSI changed, it
 invokes Windows Installer in the existing prefix. The official installer owns
 its upgrade behavior. If the MSI has not changed, no reinstall is performed;
 launching the game can still apply newer in-game patches.
@@ -30,6 +32,25 @@ ordinary installation/upgrade path. A missing game can also be installed with
 These commands never recreate or delete the prefix. They do not guarantee that
 Pokémon's own installer or game will preserve every preference across all
 future releases.
+
+### Graphical maintenance
+
+The expanded desktop actions and result dialogs in this section require v0.3.0
+or later. The v0.2.0 release supports the CLI maintenance commands described
+above.
+
+The application's desktop actions provide:
+
+| Action | Command | Successful result |
+| --- | --- | --- |
+| Check installer updates | `update --check --gui` | Installer unchanged, or an installer update is available |
+| Update game | `update --gui` | Installer unchanged, or update completed |
+| Repair game | `repair --gui` | Repair completed |
+
+Each command shows an operation-specific progress dialog followed by its result.
+An available installer is applied using **Update game**. In-game patches are
+checked when the game launches. Failures and running-session conflicts produce
+an error dialog. Close the game before using these maintenance actions.
 
 ## Interrupted operations
 
@@ -50,14 +71,11 @@ future releases.
 
 ## Launcher updates
 
-Close the game, select the intended release and full source commit, and download
-and verify that release's installer using the
-[verified release procedure](RELEASES.md#verified-release-installation).
-Pass `--launcher-only` to the verified installer:
-
-```sh
-bash ./install.sh --release vX.Y.Z --source-commit FULL_40_HEX_COMMIT --launcher-only
-```
+Close the game and choose the intended release. Use its complete installation
+block from the release notes, appending `--launcher-only` to the final `bash`
+command inside the block. The published version and source commit are already
+selected. For v0.2.0, use the
+[ready-to-run verified procedure](RELEASES.md#verified-release-installation).
 
 It installs only the explicitly selected release. The installer verifies the
 manifest's attestation against the expected repository, workflow, tag, source

@@ -81,11 +81,17 @@ main() {
 
   if [[ -z $source_dir ]]; then
     for tool in curl jq gh sha256sum; do
-      command -v "$tool" >/dev/null || fail "$tool is required to verify a release; provision it before running this installer."
+      command -v "$tool" >/dev/null || fail "Missing $tool. Prepare bootstrap tools with: omarchy pkg add github-cli curl jq coreutils"
+    done
+    local verify_help option
+    verify_help=$(gh attestation verify --help) || fail "Update github-cli to a version supporting artifact attestations."
+    for option in --bundle --hostname --repo --cert-identity --cert-oidc-issuer --source-ref --source-digest --signer-digest --deny-self-hosted-runners --predicate-type; do
+      [[ $verify_help == *"$option"* ]] || fail "GitHub CLI is missing $option. Update github-cli through Omarchy, then retry."
     done
     work_dir=$(mktemp -d "${TMPDIR:-/tmp}/ptcgl-omarchy-install.XXXXXXXX")
     release_url="https://github.com/$REPOSITORY/releases/download/$release"
     printf '\nAuthenticating launcher release %s...\n' "$release"
+    printf 'Source commit: %s\n' "$source_commit"
     for asset in release.json release.sigstore.json; do
       curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location --retry 3 \
         "$release_url/$asset" --output "$work_dir/$asset" || fail "Could not download authenticated release metadata for $release. No source-build fallback is performed."

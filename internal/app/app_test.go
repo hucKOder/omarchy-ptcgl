@@ -58,6 +58,15 @@ func testApp(t *testing.T) (*App, *fakeRunner) {
 	return a, r
 }
 
+func useTestPaths(t *testing.T, p Paths) {
+	t.Helper()
+	t.Setenv("HOME", p.Home)
+	t.Setenv("XDG_DATA_HOME", filepath.Dir(p.Data))
+	t.Setenv("XDG_CACHE_HOME", filepath.Dir(p.Cache))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Dir(p.Config))
+	t.Setenv("XDG_STATE_HOME", filepath.Dir(p.State))
+}
+
 func writeTestFile(t *testing.T, path string, content []byte) {
 	t.Helper()
 	if err := AtomicWrite(path, content, 0600); err != nil {
@@ -394,6 +403,26 @@ func TestIntegrationIsRepeatableAndRestoresPreviousHandler(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		if err := a.Integrate(context.Background()); err != nil {
 			t.Fatal(err)
+		}
+		desktopPath := filepath.Join(a.Paths.Applications, desktopID)
+		entry, err := os.ReadFile(desktopPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, action := range []string{
+			"Actions=CheckUpdate;Update;Repair;Folders;Doctor;",
+			"[Desktop Action CheckUpdate]\nName=Check installer updates\nExec=" + desktopQuote(a.Paths.Bin) + " update --check --gui",
+			"[Desktop Action Repair]\nName=Repair game\nExec=" + desktopQuote(a.Paths.Bin) + " repair --gui",
+			"[Desktop Action Folders]\nName=Open folders\nExec=" + desktopQuote(a.Paths.Bin) + " open --gui",
+		} {
+			if strings.Count(string(entry), action) != 1 {
+				t.Fatalf("missing or duplicated desktop action %q", action)
+			}
+		}
+		if validator, err := exec.LookPath("desktop-file-validate"); err == nil {
+			if output, err := exec.Command(validator, desktopPath).CombinedOutput(); err != nil {
+				t.Fatalf("invalid generated desktop entry: %v\n%s", err, output)
+			}
 		}
 	}
 	b, _ := os.ReadFile(main)
