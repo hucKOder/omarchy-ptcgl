@@ -50,14 +50,20 @@ future releases.
 
 ## Launcher updates
 
-Close the game and rerun the one-command installer in launcher-only mode:
+Close the game, select the intended release and full source commit, and download
+and verify that release's installer using the
+[verified release procedure](RELEASES.md#verified-release-installation).
+Pass `--launcher-only` to the verified installer:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/hucKOder/omarchy-ptcgl/main/install.sh | bash -s -- --launcher-only
+bash ./install.sh --release vX.Y.Z --source-commit FULL_40_HEX_COMMIT --launcher-only
 ```
 
-It installs the latest published launcher release. A failed release download or
-checksum check stops installation before replacing the executable.
+It installs only the explicitly selected release. The installer verifies the
+manifest's attestation against the expected repository, workflow, tag, source
+commit, and GitHub-hosted runner policy, then checks the launcher hash. A missing
+release or any verification failure stops before package installation or launcher
+replacement. There is no automatic build-from-`main` fallback.
 
 For a local development checkout, obtain the new repository version, then run:
 

@@ -50,17 +50,31 @@ terminals while the layout changes.*
 
 ## Install
 
-Run one command in your Omarchy terminal:
+First, make sure **`osslsigncode`** is available. It verifies the official game's
+installer signature and publisher. Provision it separately using
+[reviewed packaging](docs/AUR-DEPENDENCIES.md); this project does not install AUR
+packages automatically. This prerequisite also applies to `--launcher-only`.
+
+For a published release, follow the
+[verified release installation procedure](docs/RELEASES.md#verified-release-installation).
+It downloads the installer as data and verifies its attestation **before running
+it**, using an explicitly selected version and full source commit. Release
+installation also requires a recent GitHub CLI (`gh`), `curl`, `jq`, and
+`sha256sum`.
+
+After that verification, the installer is invoked as:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hucKOder/omarchy-ptcgl/main/install.sh | bash
+bash ./install.sh --release vX.Y.Z --source-commit FULL_40_HEX_COMMIT
 ```
 
-Run as your regular desktop user. The installer handles the rest:
+Replace the version and commit with the reviewed release selection. Run as your
+regular desktop user. The installer checks prerequisites and authenticates release
+metadata and the launcher before making installation changes, then:
 
-- Installs dependencies through `omarchy pkg add` and `omarchy pkg aur add`.
+- Installs repository dependencies through `omarchy pkg add`.
 - Uses Omarchy's gaming helper to install the appropriate 32-bit GPU drivers.
-- Downloads the latest prebuilt launcher and verifies its SHA-256 checksum.
+- Uses the selected prebuilt launcher, verified against its attested manifest.
 - Adds **Pokémon TCG Live (Omarchy)** to the app launcher, registers browser
   login, and installs the tiled-window rules.
 - Prepares Proton and installs the official Pokémon client, verifying the MSI's
@@ -88,10 +102,11 @@ rerun the installer or open the app to resume setup.
 <details>
 <summary><strong>Install only the launcher, or install from a checkout</strong></summary>
 
-To leave the game download for the first app-menu launch:
+To leave the game download for the first app-menu launch, add `--launcher-only`
+to the [verified release procedure](docs/RELEASES.md#verified-release-installation):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hucKOder/omarchy-ptcgl/main/install.sh | bash -s -- --launcher-only
+bash ./install.sh --release vX.Y.Z --source-commit FULL_40_HEX_COMMIT --launcher-only
 ```
 
 To build and install a local checkout, including dependencies and game setup:
@@ -99,10 +114,13 @@ To build and install a local checkout, including dependencies and game setup:
 ```bash
 git clone https://github.com/hucKOder/omarchy-ptcgl.git
 cd omarchy-ptcgl
-bash ./install.sh
+git checkout --detach FULL_40_HEX_COMMIT
+# Review the selected source before executing it.
+bash ./install.sh --local
 ```
 
-`make install` runs the same local installation flow. Local builds need Go 1.24+
+Replace `FULL_40_HEX_COMMIT` with the source revision you intend to build.
+`make install` runs the explicit local installation flow. Local builds need Go 1.24+
 and Make; the installer adds them through Omarchy when needed.
 
 Prefer the terminal? Setup and launch are also available separately:
@@ -130,12 +148,17 @@ An unchanged MSI is skipped. Updates and repairs use the existing prefix;
 maintenance is blocked while the launcher-managed game session is running.
 `update --check` compares the official MSI, not the game's in-client patch state.
 
-**Launcher and Proton updates are separate.** Close the game and rerun the
-installer to get the latest launcher:
+**Launcher and Proton updates are separate.** Close the game, choose the release
+and full source commit, and repeat the
+[verified release procedure](docs/RELEASES.md#verified-release-installation) with
+`--launcher-only`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hucKOder/omarchy-ptcgl/main/install.sh | bash -s -- --launcher-only
+bash ./install.sh --release vX.Y.Z --source-commit FULL_40_HEX_COMMIT --launcher-only
 ```
+
+Missing releases, invalid attestations, or mismatched hashes stop installation.
+The installer never falls back to building `main`.
 
 Your selected Proton profile is retained. To explicitly select the profile
 bundled with the new launcher release:

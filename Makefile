@@ -1,5 +1,5 @@
 GO ?= go
-VERSION ?= 0.1.0
+VERSION ?= 0.2.0
 
 .PHONY: build test check install install-launcher uninstall clean
 build:
@@ -10,13 +10,13 @@ test:
 	$(GO) test -race ./...
 
 check:
-	bash -n install.sh
+	bash -n install.sh scripts/release-assets.sh
 	$(GO) vet ./...
 	$(GO) test ./...
 	test -z "$$(gofmt -l cmd internal)"
 
 install:
-	bash ./install.sh
+	bash ./install.sh --local
 
 install-launcher: build
 	./build/ptcgl-omarchy install

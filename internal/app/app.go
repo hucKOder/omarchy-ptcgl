@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 )
 
-var Version = "0.1.0"
+var Version = "0.2.0"
 
 type App struct {
 	Paths    Paths
@@ -54,7 +54,7 @@ func (a *App) require(names ...string) error {
 	for _, name := range names {
 		if _, err := a.LookPath(name); err != nil {
 			if name == "osslsigncode" {
-				return fmt.Errorf("missing osslsigncode; install with: omarchy pkg aur add osslsigncode")
+				return fmt.Errorf("missing osslsigncode; provision it separately from reviewed packaging: https://github.com/hucKOder/omarchy-ptcgl/blob/main/docs/AUR-DEPENDENCIES.md")
 			}
 			return fmt.Errorf("missing %s; install dependencies with: omarchy pkg add umu-launcher zenity", name)
 		}

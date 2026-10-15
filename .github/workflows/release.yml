@@ -8,29 +8,92 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    outputs:
+      artifact-id: ${{ steps.assets.outputs.artifact-id }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: false
       - run: make check
       - run: make test
-      - name: Build Linux x86-64 launcher
+      - name: Build versioned release assets
         run: |
           [[ $GITHUB_REF_NAME =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
+          [[ $(git rev-parse HEAD) == "$GITHUB_SHA" ]]
           make build VERSION="${GITHUB_REF_NAME#v}"
-          cp build/ptcgl-omarchy build/ptcgl-omarchy-linux-amd64
-          sha256sum build/ptcgl-omarchy-linux-amd64 > build/ptcgl-omarchy-linux-amd64.sha256
-      - name: Publish launcher and checksum
+          bash scripts/release-assets.sh "$GITHUB_REF_NAME" "$GITHUB_SHA"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: assets
+        with:
+          name: release-${{ github.sha }}-${{ github.run_attempt }}
+          path: build/release/
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          merge-multiple: true
+          path: release
+      - name: Validate release metadata and artifact digests
+        run: |
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg release "$GITHUB_REF_NAME" --arg commit "$GITHUB_SHA" '
+            .schema == 1 and .repository == $repo and .release == $release and
+            .source_commit == $commit and .platform == "linux-amd64" and
+            .launcher == "ptcgl-omarchy-linux-amd64" and
+            (.installer_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and
+            (.launcher_sha256 | type == "string" and test("^[0-9a-f]{64}$"))
+          ' release/release.json
+          launcher_hash=$(sha256sum release/ptcgl-omarchy-linux-amd64)
+          installer_hash=$(sha256sum release/install.sh)
+          [[ ${launcher_hash%% *} == "$(jq -er .launcher_sha256 release/release.json)" ]]
+          [[ ${installer_hash%% *} == "$(jq -er .installer_sha256 release/release.json)" ]]
+      - name: Attest release assets
+        id: attest
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: |
+            release/install.sh
+            release/release.json
+            release/ptcgl-omarchy-linux-amd64
+      - name: Publish authenticated release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
         run: |
+          cp "$BUNDLE_PATH" release/release.sigstore.json
+          for asset in install.sh release.json ptcgl-omarchy-linux-amd64; do
+            gh attestation verify "release/$asset" \
+              --bundle release/release.sigstore.json --hostname github.com \
+              --repo "$GITHUB_REPOSITORY" \
+              --cert-identity "https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@refs/tags/$GITHUB_REF_NAME" \
+              --cert-oidc-issuer https://token.actions.githubusercontent.com \
+              --source-ref "refs/tags/$GITHUB_REF_NAME" --source-digest "$GITHUB_SHA" \
+              --signer-digest "$GITHUB_SHA" --deny-self-hosted-runners \
+              --predicate-type https://slsa.dev/provenance/v1
+          done
+          printf 'Release: %s\nSource commit: %s\n\nVerify install.sh before running it; see docs/RELEASES.md at this commit.\n' \
+            "$GITHUB_REF_NAME" "$GITHUB_SHA" > release/notes.md
           gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
-            --title "$GITHUB_REF_NAME" \
-            build/ptcgl-omarchy-linux-amd64 build/ptcgl-omarchy-linux-amd64.sha256
+            --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes-file release/notes.md \
+            release/install.sh release/release.json release/release.sigstore.json \
+            release/ptcgl-omarchy-linux-amd64

@@ -3,6 +3,7 @@
 set -euo pipefail
 
 REPOSITORY="hucKOder/omarchy-ptcgl"
+RELEASE_WORKFLOW="$REPOSITORY/.github/workflows/release.yml"
 launcher_only=false
 work_dir=""
 
@@ -10,11 +11,14 @@ usage() {
   printf '%s\n' \
     "Install Pokémon TCG Live for Omarchy" \
     "" \
-    "Usage: bash install.sh [--launcher-only]" \
+    "Usage: bash install.sh --release <vX.Y.Z> --source-commit <40-hex> [--launcher-only]" \
+    "       bash install.sh --local [--launcher-only]" \
     "" \
-    "Installs dependencies, desktop integration, and the game for your user." \
+    "Installs repository dependencies, desktop integration, and the game for your user." \
+    "Requires osslsigncode to be installed separately from reviewed packaging." \
     "--launcher-only  Leave game setup for the first app-menu launch." \
-    "Run from a checkout to build that checkout instead of downloading a release."
+    "Run a downloaded installer only after verifying its release attestation." \
+    "--local  Build the explicitly selected local checkout instead of a release."
 }
 
 fail() {
@@ -31,16 +35,41 @@ cleanup() {
 trap cleanup EXIT
 
 main() {
-  local arg hypr_config script_dir status tag release_url launcher expected actual
-  local source_dir=""
+  local hypr_config script_dir release_url launcher expected actual tool asset
+  local source_dir="" release="" source_commit="" local_build=false
 
-  for arg in "$@"; do
-    case "$arg" in
+  while (( $# )); do
+    case "$1" in
+      --release)
+        (( $# >= 2 )) || fail "--release requires a version."
+        [[ -z $release ]] || fail "Specify --release only once."
+        release=$2
+        shift
+        ;;
+      --source-commit)
+        (( $# >= 2 )) || fail "--source-commit requires a full Git commit."
+        [[ -z $source_commit ]] || fail "Specify --source-commit only once."
+        source_commit=$2
+        shift
+        ;;
+      --local) local_build=true ;;
       --launcher-only) launcher_only=true ;;
       --help | -h) usage; exit 0 ;;
-      *) usage >&2; fail "Unknown option: $arg" ;;
+      *) usage >&2; fail "Unknown option: $1" ;;
     esac
+    shift
   done
+
+  if [[ $local_build == true ]]; then
+    [[ -z $release && -z $source_commit ]] || fail "--local cannot be combined with release selection."
+    [[ -n ${BASH_SOURCE[0]:-} ]] || fail "--local requires an installer file in a checkout."
+    script_dir=$(dirname -- "$(realpath -- "${BASH_SOURCE[0]}")")
+    [[ -f $script_dir/go.mod && -f $script_dir/cmd/ptcgl-omarchy/main.go ]] || fail "--local requires a PTCGL source checkout."
+    source_dir=$script_dir
+  else
+    [[ $release =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || fail "Select an explicit release with --release vX.Y.Z."
+    [[ $source_commit =~ ^[0-9a-f]{40}$ ]] || fail "--source-commit must be the release's full 40-character lowercase Git commit."
+  fi
 
   (( EUID != 0 )) || fail "Run as your desktop user, without sudo. Omarchy will request sudo when needed."
   [[ $(uname -s) == Linux && $(uname -m) == x86_64 ]] || fail "This installer requires x86-64 Linux."
@@ -48,55 +77,46 @@ main() {
   [[ -z ${XDG_CONFIG_HOME:-} || $XDG_CONFIG_HOME == /* ]] || fail "XDG_CONFIG_HOME must be an absolute path."
   hypr_config="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.lua"
   [[ -f $hypr_config ]] || fail "Omarchy's Lua Hyprland config is required at $hypr_config (Hyprland 0.55+)."
+  command -v osslsigncode >/dev/null || fail "osslsigncode is required to verify the official game installer. Provision it separately from reviewed packaging, then rerun this installer. See https://github.com/$REPOSITORY/blob/main/docs/AUR-DEPENDENCIES.md"
+
+  if [[ -z $source_dir ]]; then
+    for tool in curl jq gh sha256sum; do
+      command -v "$tool" >/dev/null || fail "$tool is required to verify a release; provision it before running this installer."
+    done
+    work_dir=$(mktemp -d "${TMPDIR:-/tmp}/ptcgl-omarchy-install.XXXXXXXX")
+    release_url="https://github.com/$REPOSITORY/releases/download/$release"
+    printf '\nAuthenticating launcher release %s...\n' "$release"
+    for asset in release.json release.sigstore.json; do
+      curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location --retry 3 \
+        "$release_url/$asset" --output "$work_dir/$asset" || fail "Could not download authenticated release metadata for $release. No source-build fallback is performed."
+    done
+    gh attestation verify "$work_dir/release.json" \
+      --bundle "$work_dir/release.sigstore.json" --hostname github.com \
+      --repo "$REPOSITORY" \
+      --cert-identity "https://github.com/$RELEASE_WORKFLOW@refs/tags/$release" \
+      --cert-oidc-issuer https://token.actions.githubusercontent.com \
+      --source-ref "refs/tags/$release" --source-digest "$source_commit" \
+      --signer-digest "$source_commit" --deny-self-hosted-runners \
+      --predicate-type https://slsa.dev/provenance/v1 || fail "Release attestation verification failed; installation stopped."
+    expected=$(jq -er --arg repo "$REPOSITORY" --arg release "$release" --arg commit "$source_commit" '
+      select(.schema == 1 and .repository == $repo and .release == $release and
+        .source_commit == $commit and .platform == "linux-amd64" and
+        .launcher == "ptcgl-omarchy-linux-amd64" and
+        (.installer_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and
+        (.launcher_sha256 | type == "string" and test("^[0-9a-f]{64}$"))) |
+      .launcher_sha256
+    ' "$work_dir/release.json") || fail "Release manifest does not match the selected release, source commit, or platform."
+    launcher="$work_dir/ptcgl-omarchy-linux-amd64"
+    curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location --retry 3 \
+      "$release_url/ptcgl-omarchy-linux-amd64" --output "$launcher" || fail "Could not download the selected launcher."
+    actual=$(sha256sum "$launcher")
+    [[ ${actual%% *} == "$expected" ]] || fail "Launcher checksum does not match the authenticated manifest."
+    chmod 755 "$launcher"
+  fi
 
   printf '\nInstalling Pokémon TCG Live for Omarchy...\n\n'
   omarchy pkg add umu-launcher zenity desktop-file-utils xdg-utils
-  omarchy pkg aur add osslsigncode
   omarchy install gaming gpu-lib32
-
-  work_dir=$(mktemp -d "${TMPDIR:-/tmp}/ptcgl-omarchy-install.XXXXXXXX")
-  # BASH_SOURCE is empty when the installer is piped to Bash.
-  if [[ -n ${BASH_SOURCE[0]:-} ]]; then
-    script_dir=$(dirname -- "$(realpath -- "${BASH_SOURCE[0]}")")
-    if [[ -f $script_dir/go.mod && -f $script_dir/cmd/ptcgl-omarchy/main.go ]]; then
-      source_dir=$script_dir
-    fi
-  fi
-
-  if [[ -z $source_dir ]]; then
-    omarchy pkg add curl jq
-    printf '\nFinding the latest launcher release...\n'
-    status=$(curl --fail --silent --show-error --location --retry 3 \
-      --output "$work_dir/release.json" --write-out '%{http_code}' \
-      "https://api.github.com/repos/$REPOSITORY/releases/latest") || {
-        [[ $status == 404 ]] || fail "Could not check launcher releases. Retry the installer."
-      }
-    case "$status" in
-      200)
-        tag=$(jq -er '.tag_name' "$work_dir/release.json")
-        [[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || fail "Invalid launcher release tag."
-        release_url="https://github.com/$REPOSITORY/releases/download/$tag"
-        launcher="$work_dir/ptcgl-omarchy-linux-amd64"
-        printf '\nDownloading launcher %s...\n' "$tag"
-        curl --fail --silent --show-error --location --retry 3 \
-          "$release_url/ptcgl-omarchy-linux-amd64" --output "$launcher"
-        curl --fail --silent --show-error --location --retry 3 \
-          "$release_url/ptcgl-omarchy-linux-amd64.sha256" --output "$launcher.sha256"
-        read -r expected _ < "$launcher.sha256" || fail "Invalid launcher checksum."
-        [[ $expected =~ ^[0-9a-f]{64}$ ]] || fail "Invalid launcher checksum."
-        actual=$(sha256sum "$launcher")
-        [[ ${actual%% *} == "$expected" ]] || fail "Launcher checksum mismatch. Retry the installer."
-        chmod 755 "$launcher"
-        ;;
-      404)
-        printf '\nNo published release yet; building the launcher from main...\n'
-        omarchy pkg add git
-        source_dir="$work_dir/source"
-        git clone --depth 1 --branch main "https://github.com/$REPOSITORY.git" "$source_dir"
-        ;;
-      *) fail "Unexpected release response: $status" ;;
-    esac
-  fi
 
   if [[ -n $source_dir ]]; then
     printf '\nBuilding the launcher...\n'
@@ -120,6 +140,5 @@ main() {
   printf 'Terminal launch: %q\n' "$HOME/.local/bin/ptcgl-omarchy"
 }
 
-# Define the whole flow before running it, so subprocesses cannot consume the
-# remaining installer code when invoked with curl ... | bash.
+# Define the whole flow before invoking any subprocesses.
 main "$@"
