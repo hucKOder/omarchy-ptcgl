@@ -178,3 +178,34 @@ uninstalled or reset.
 This verifies fresh application provisioning and first browser sign-in on the
 existing host. It does not establish clean-OS dependency provisioning, availability
 of a supported verifier package channel, or publication of the candidate release.
+
+## Published v0.3.0 verification — 2026-10-15
+
+- Release: <https://github.com/hucKOder/omarchy-ptcgl/releases/tag/v0.3.0>.
+- Tagged source: `0346263b6fc5bf02746d7376570bc7e4f58c18e6`.
+- The [release workflow](https://github.com/hucKOder/omarchy-ptcgl/actions/runs/38751789084)
+  and both source/tag CI runs passed. The release is stable and selected as Latest.
+- Downloaded all four published assets. Installer, manifest, and launcher
+  attestations passed the explicit repository/workflow/tag/source/runner policy.
+  Manifest identity/platform fields and installer/launcher hashes matched.
+- Published installer SHA-256:
+  `40a29862fbceb33a3d9967ab597f96c781a56eb3f580fce4c92038a8d86d0e69`.
+- Published launcher SHA-256:
+  `771b50edb1e32af4e422298a268e6e743e86b076c709f1a3f823a4f9f76ab6c7`.
+
+The published installation block matched the reviewed generated instructions,
+including the explicit version and source commit. Executed that block with the
+documented `--launcher-only` option. It downloaded and authenticated the installer,
+authenticated release metadata and the launcher, and refreshed the existing
+launcher/integration successfully.
+
+The installed executable matched the published launcher hash and reported
+`ptcgl-omarchy 0.3.0`. All 16 diagnostics passed. Hashes of the game registry,
+installation receipt, selected runtime profile, main Hyprland Lua config, and
+managed window rules were identical before and after the upgrade.
+
+This establishes the published download/authentication path and launcher-only
+upgrade on the existing host. The fresh application installation/sign-in test
+above used the equivalent local candidate before version stamping. Clean-OS
+dependency provisioning, interrupted-install recovery improvements, and a future
+changed-MSI upgrade remain separate follow-up work.

@@ -23,8 +23,9 @@ delivery, tiled startup, resizing, and repeat-launch focus are recorded in
   repeat launch, maintenance blocking, and a successful post-repair launch.
 - [ ] Record a real changed-MSI upgrade when a newer official installer is
   available, including preservation of existing settings.
-- [ ] Smoke-test the next tagged release's published downloads and attestations
-  using the [verified release procedure](RELEASES.md#verified-release-installation).
+- [x] Smoke-tested v0.3.0 published downloads and attestations, then completed a
+  launcher-only upgrade using the published installation block. The installed
+  binary matched the published digest and all 16 diagnostics passed.
 
 ## Installation follow-up
 
@@ -47,7 +48,8 @@ Release-specific instruction generation, ready-to-run v0.2.0 instructions, and
 early GitHub CLI capability checks are implemented and covered by isolated tests.
 The package investigation confirmed `osslsigncode` is absent from the checked
 Arch/Omarchy binary channels; upstream packaging, setup progress/recovery, and
-published-release acceptance remain open.
+clean-OS acceptance remain open. Published v0.3.0 authentication and the
+launcher-only upgrade are verified in the validation record.
 
 The local candidate was independently reviewed, review findings were fixed, and
 real desktop/maintenance checks passed on 2026-10-15. See the validation record

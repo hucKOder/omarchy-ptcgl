@@ -87,7 +87,7 @@ mismatched or tampered installer bytes before execution.
 Implementation: `scripts/release-notes.md.in` is rendered by
 `scripts/release-assets.sh` and consumed by the publish job. Tests execute the
 generated block with isolated tools and ensure the v0.2.0 documentation matches
-the same generated procedure. Published-release smoke testing remains in step 5.
+the same generated procedure. Published v0.3.0 smoke testing is recorded in step 5.
 
 ## 3. Explain prerequisites before starting
 
@@ -152,15 +152,17 @@ previous successful installation receipt until replacement succeeds.
   game prefix, build toolchain, or pre-provisioned verifier. Use a separate test
   machine or disposable environment; complete graphics/browser/gameplay checks
   on a suitable real desktop.
-- [ ] Repeat using the published release assets and instructions. A source-tree
-  or stubbed verification test alone does not establish release readiness.
-- [ ] Check the full path, launcher-only upgrade, and recovery after interrupted
-  downloads and MSI application. Include missing/old prerequisites and failed
-  authentication as negative cases.
+- [x] Verify published v0.3.0 assets and execute its generated installation block
+  for a launcher-only upgrade. All three attestations and manifest hashes passed;
+  the installed binary matched the published artifact, all 16 diagnostics passed,
+  and preserved game/configuration state retained its hashes.
+- [ ] Complete the published-release full-install and interrupted-download/MSI
+  recovery checks. Include missing/old prerequisites and failed authentication as
+  negative cases. The launcher-only upgrade above is already verified.
 - [ ] Have a first-time tester follow only the user-facing instructions, without
   developer coaching. Record manual decisions/actions, time to launch, and any
   points where they leave the normal installation guide.
-- [ ] Record the exact release, source commit, host/tool versions, and results in
+- [x] Record v0.3.0, its source commit, host/tool versions, and verified results in
   [the validation record](VALIDATION.md).
 
 **Done when:** the tester reaches browser sign-in and gameplay through the
@@ -188,7 +190,6 @@ replace the current release-authentication policy with package signatures.
 ## Next implementation slice
 
 Follow up on the Omarchy package contribution and implement setup progress and
-recovery. Release-specific instruction generation and the channel investigation
-are implemented; the distribution handoff and published-release acceptance are
-still open. Do not call the clean-machine installation problem solved until both
-pass.
+recovery. Release-specific instructions, published-artifact authentication, and
+the launcher-only upgrade are verified. The distribution handoff and clean-machine
+acceptance are still open; both are needed to complete the simple-install target.
