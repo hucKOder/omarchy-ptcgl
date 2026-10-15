@@ -40,11 +40,12 @@ tasks, and release acceptance criteria:
 4. Add understandable setup progress and reliable, stage-specific recovery.
 5. Validate the published procedure on clean Omarchy with a first-time tester.
 
-The v0.4.0 candidate embeds pinned Relic MSI verification, eliminating verifier
+The v0.4.0 release embeds pinned Relic MSI verification, eliminating verifier
 packaging and AUR provisioning. Its source bootstrap installs repository tools,
 selects a release, and authenticates the release installer before execution.
-The README now leads with one command. Publication and clean-OS acceptance are
-still required before the new installation flow can be announced as available.
+The README now leads with one command. Published assets and the launcher-only
+one-command flow passed isolated HOME/XDG verification; clean-OS acceptance
+remains a separate task. See [the v0.4.0 validation record](VALIDATION.md#published-v040-verification--2026-10-15).
 
 Release-specific instruction generation, ready-to-run v0.2.0 instructions, and
 early GitHub CLI capability checks are implemented and covered by isolated tests.

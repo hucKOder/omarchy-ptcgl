@@ -209,3 +209,49 @@ upgrade on the existing host. The fresh application installation/sign-in test
 above used the equivalent local candidate before version stamping. Clean-OS
 dependency provisioning, interrupted-install recovery improvements, and a future
 changed-MSI upgrade remain separate follow-up work.
+
+## Published v0.4.0 verification — 2026-10-15
+
+- Release: <https://github.com/hucKOder/omarchy-ptcgl/releases/tag/v0.4.0>.
+- Tagged source: `45e4398fc0477be23d946a727f13bb5c41fec9f1`.
+- [Source CI](https://github.com/hucKOder/omarchy-ptcgl/actions/runs/38758723811),
+  [tag CI](https://github.com/hucKOder/omarchy-ptcgl/actions/runs/38758943854), and
+  the [release workflow](https://github.com/hucKOder/omarchy-ptcgl/actions/runs/38758943643)
+  passed. The release is stable and selected as Latest.
+- Downloaded all four published assets. Installer, manifest, and launcher
+  attestations passed the explicit repository/workflow/tag/source/runner policy.
+  Manifest identity/platform fields and installer/launcher SHA-256 hashes matched.
+- Published installer SHA-256:
+  `7281d7db837ef3b137057059790a5bcdaf343afbcc571a5c02a6366b93118868`.
+- Published launcher SHA-256:
+  `dd523b6c0e219309259f34c7d2af6d445608a192ae35de75805c7d2cdeddc3dc`.
+- The binary reports `ptcgl-omarchy 0.4.0`; build metadata identifies Go 1.27.2,
+  the tagged source commit, `linux/amd64`, `CGO_ENABLED=0`, and an unmodified
+  release checkout. Its `licenses` output matches the committed dependency notices.
+
+Executed the README's real source-bootstrap command with `--launcher-only` in
+temporary HOME/XDG directories. Package-management and browser-handler commands
+were isolated stubs; release discovery, source-tag resolution, network downloads,
+attestation verification, the published installer, and launcher self-installation
+were real. `GH_TOKEN`, `GITHUB_TOKEN`, and `GH_CONFIG_DIR` were unset. The flow
+selected v0.4.0 and its full source commit without manual substitution, installed
+the exact published launcher bytes, and generated the desktop entries and Lua
+rules under the temporary paths. No game prefix was created by launcher-only mode.
+The published notes contain the expected commit-pinned one-line command.
+
+Both the published binary and sandbox-installed copy successfully verified the
+cached official Pokémon MSI, including its content/signature, exact publisher,
+certificate chains, timestamp, and current online CRLs. The installed-copy check
+used a failing `osslsigncode` stub on PATH, establishing that the built-in verifier
+does not depend on that external tool.
+
+Local `make check`, `make test`, `make build`, and `go mod verify` passed before
+publication. Source vulnerability analysis found no reachable vulnerabilities;
+the unused-module advisories reported by the scanner were retained in its output.
+The release was built with the stable Go toolchain, while CI also checked the
+minimum Go version declared by the project.
+
+This verifies the published authentication path, isolated launcher installation,
+and real MSI verification. Actual package provisioning on clean Omarchy, a fresh
+full-game installation with v0.4.0, and new gameplay acceptance remain separate
+manual validation tasks.

@@ -3,9 +3,10 @@
 Installation simplification is being delivered in stages. The v0.3.0 release adds
 complete release-specific instructions, prerequisite checks, and desktop QoL. The
 independent onboarding review on 2026-10-15 also identified dependency provisioning
-and recovery work. The v0.4.0 candidate now replaces the external verifier with
-built-in Relic verification and adds a one-command source bootstrap. Publication
-and clean-machine acceptance remain pending.
+and recovery work. The v0.4.0 release replaces the external verifier with built-in
+Relic verification and adds a one-command source bootstrap. Published artifacts
+and isolated launcher-only installation are verified; clean-machine acceptance
+remains pending.
 
 ## Target experience
 
@@ -25,7 +26,7 @@ the release-specific manual block. See [the trust model](RELEASES.md).
 
 | Priority | Work | Dependency |
 | --- | --- | --- |
-| P0 | Remove external verifier distribution | Implemented in the v0.4.0 candidate with pinned Relic; release validation pending |
+| P0 | Remove external verifier distribution | Released in v0.4.0 with pinned Relic; published-artifact verification passed |
 | P1 | Publish one complete, release-specific installation procedure | Can start immediately alongside P0 |
 | P1 | Improve prerequisite checks and failure messages | Use the selected provisioning route once P0 is resolved |
 | P1 | Make setup progress and recovery predictable | Repository-local launcher changes |
@@ -203,7 +204,7 @@ replace the current release-authentication policy with package signatures.
 
 ## Next implementation slice
 
-Publish and validate the v0.4.0 built-in verifier and one-command bootstrap on
-clean Omarchy, then implement setup progress and recovery. The existing v0.3.0
+Validate the v0.4.0 built-in verifier and one-command bootstrap on clean Omarchy,
+then implement setup progress and recovery. The existing v0.3.0
 release-specific installation and launcher-only upgrade remain verified. Legacy
 verifier packaging is no longer on the new installation's critical path.
