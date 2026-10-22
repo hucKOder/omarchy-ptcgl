@@ -275,7 +275,7 @@ make security
 make build
 ```
 
-The security candidate requires Go 1.27.3 or later to include compromised-CA
+The v0.4.1 security release requires Go 1.27.3 or later to include compromised-CA
 rejection. `make security` checks module integrity and reachable vulnerabilities
 with that selected build toolchain. `make check-shell` requires ShellCheck.
 See the [security audit and patch status](docs/SECURITY-AUDIT.md).

@@ -45,11 +45,11 @@ needed. This removes the AUR packaging trust boundary; it is not a claim that
 the replacement library is vulnerability-free. Release maintenance includes
 dependency vulnerability checks and negative verification tests.
 
-The security candidate raises the build minimum to Go 1.27.3, including the
+The v0.4.1 security release raises the build minimum to Go 1.27.3, including the
 compromised-public-key distrust fix for GO-2026-6809 / CVE-2026-111943. Previously
-published v0.4.0 bytes still contain Go 1.27.2. The patched source must be built
-and published as a new version; neither source changes nor an updated compiler
-repair an already-installed binary. `curl`, `gh`, and the initial source bootstrap
+published v0.4.0 bytes still contain Go 1.27.2. Install v0.4.1 or later to receive
+the patched runtime; neither source changes nor an updated compiler repair an
+already-installed binary. `curl`, `gh`, and the initial source bootstrap
 have separate trust paths that must also be assessed on the installation host.
 
 ## Trust model

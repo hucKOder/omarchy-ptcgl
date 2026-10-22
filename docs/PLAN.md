@@ -63,8 +63,9 @@ after the current session exits.
 - [x] **P1 settings activation — SEC-04:** protect `main`, release tags, and publishing
   with the documented solo-maintainer policy, CI-bound required checks, no bypass,
   and an owner-approved tag-only `release` environment. The real policy check passes.
-- [ ] Validate the policy job's hosted token/API access and separate-runner rebuild
-  in GitHub. The solo-maintainer process does not provide independent human review.
+- [x] Validate hosted public-metadata checks and the separate-runner rebuild in
+  GitHub. The full owner-authenticated no-bypass audit passed before each release
+  approval; the solo-maintainer process does not provide independent human review.
 - [x] **P1 source — SEC-05:** constrain game/runtime and MSI-worker environments; verify that
   synthetic GitHub/cloud/model credentials are excluded from play, setup,
   maintenance, and callbacks while required desktop/runtime settings survive.
@@ -84,7 +85,8 @@ after the current session exits.
 - [x] Recheck fresh browser login and gameplay after the reported 61/61 login stall.
   The user confirmed a clean fresh login and completed match with graphics/audio;
   the initial failure/recovery remains recorded without a confirmed launcher cause.
-- [ ] Publish a new security patch release with verified provenance and build comparison.
+- [x] Publish v0.4.1 with verified provenance and exact hosted/local build comparison;
+  authenticate and install the published upgrade with preservation checks.
 
 ## Installation follow-up
 
