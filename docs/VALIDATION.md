@@ -362,3 +362,49 @@ owner's default full policy audit. The owner must pass that full audit, includin
 visible empty bypass lists, before release-environment approval. Regression
 fixtures cover hidden lists, rejection of known bypass actors in either mode,
 missing CI, and unknown options. The failed tag is retained rather than moved.
+
+## Published v0.4.1 verification — 2026-10-22
+
+- Stable release: <https://github.com/hucKOder/omarchy-ptcgl/releases/tag/v0.4.1>;
+  selected as Latest.
+- Tagged source: `06345c9bb9a5c2502770fca34aec3e45f3eaed9d`, merged through
+  [the security PR](https://github.com/hucKOder/omarchy-ptcgl/pull/1) and
+  [the hosted-visibility fix](https://github.com/hucKOder/omarchy-ptcgl/pull/2),
+  with required CI passing under the active branch ruleset.
+- [RC2 workflow](https://github.com/hucKOder/omarchy-ptcgl/actions/runs/39779613967)
+  passed every gate and published a prerelease without replacing Latest.
+- [Stable release workflow](https://github.com/hucKOder/omarchy-ptcgl/actions/runs/39780062584)
+  passed public policy metadata, source ancestry, vulnerability analysis,
+  shell/unit/race checks, build, separate-runner exact reproduction, and protected
+  publication. Before each environment approval, the owner's full authenticated
+  no-bypass policy check also passed. No administration credential was stored in
+  Actions.
+- Downloaded all four stable assets. Installer, manifest, and launcher
+  attestations passed the exact repository/workflow/tag/source/signer/issuer/
+  hosted-runner policy. Identity/platform fields and both artifact hashes matched.
+- Published installer SHA-256:
+  `7281d7db837ef3b137057059790a5bcdaf343afbcc571a5c02a6366b93118868`.
+- Published launcher SHA-256:
+  `e33b58f83dcf412810f7deb2832c7efe3c3c31feafd1933ef4649a83e37a1897`.
+- The launcher reports `ptcgl-omarchy 0.4.1`, Go 1.27.3, Linux/amd64,
+  `CGO_ENABLED=0`, the tagged source, and an unmodified checkout. A clean local
+  tagged-source build also matched the published launcher bytes exactly.
+- The published binary authenticated the existing official MSI with current
+  complete-chain revocation evidence.
+
+Executed the real commit-pinned source bootstrap with explicit v0.4.1/source
+selection and `--launcher-only`, using real downloads, attestations, installer,
+dependency checks, and self-installation. The downloaded bootstrap matched the
+reviewed source bytes. The installed executable matched the published launcher
+digest and reported v0.4.1. All diagnostics passed, and the installed launcher
+successfully authenticated a fresh official-installer update check.
+
+Before/after hashes of the registry, installation receipt, runtime profile,
+integration state, MIME preferences, and main/managed Hyprland configuration were
+identical across the published upgrade and update check. The candidate's fresh
+provisioning/desktop checks and user-confirmed fresh login/online match are
+recorded above, including the initial 61/61 stall and subsequent clean retry.
+
+Clean-OS dependency provisioning, a future changed-MSI upgrade, custom overlays,
+and filesystem/network sandboxing remain separate follow-ups. The installed
+security release and its authenticated upgrade acceptance are complete.

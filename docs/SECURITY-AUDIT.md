@@ -21,15 +21,15 @@ evidence that every security property is correct.
 
 ### Bulk patch status
 
-The following source changes implement the audit's first patch set. They are
-development-candidate results, not changes to published v0.4.0 or the active game.
+The following changes implement the audit's first patch set and are now published
+in v0.4.1. Existing v0.4.0 assets retain their original bytes.
 
 | Finding | Source-patch status | Remaining acceptance |
 | --- | --- | --- |
-| SEC-01 | Complete non-root CRL checking, fail-closed missing evidence, alternate-chain handling, and permanent publisher/timestamp regressions. Installed-candidate verification and upgrade preservation passed. | Published-release and authenticated upgrade acceptance. |
-| SEC-02 | Go 1.27.3, explicit-root compromised-key regressions, and real downloader rejection passed; the scan reports zero reachable vulnerabilities. Host CA/active `gh` remediation also passed. | Publish patched artifacts and verify the authenticated installation. |
+| SEC-01 | Complete non-root CRL checking, fail-closed missing evidence, alternate-chain handling, and permanent publisher/timestamp regressions. Installed-candidate verification and upgrade preservation passed. | Published v0.4.1 verification and authenticated upgrade passed. |
+| SEC-02 | Go 1.27.3, explicit-root compromised-key regressions, and real downloader rejection passed; the scan reports zero reachable vulnerabilities. Host CA/active `gh` remediation also passed. | Patched artifacts are published; authenticated installation passed. |
 | SEC-03 | Root-confined extraction, full link-graph validation, and escape/cycle/valid-link regressions passed. Fresh isolated real runtime provisioning passed. | Clean-OS dependency provisioning remains a separate acceptance task. |
-| SEC-04 | Fail-closed source policy, CI-protected main ancestry, and a separate-runner rebuild gate are prepared. Solo-maintainer main/tag/environment settings are active, and the real policy check passes. | Validate hosted jobs, exact rebuild comparison, and published assets. |
+| SEC-04 | Hosted metadata checks, CI-protected main ancestry, owner full-policy approval, and separate-runner reproduction passed. Solo-maintainer main/tag/environment settings are active. | Hosted jobs, exact rebuild comparison, and published assets passed verification. |
 | SEC-05 | Explicit runtime/verifier environment allowlist passed synthetic and real-process credential exclusion checks. Desktop tests and user-confirmed fresh login/gameplay passed. | Same-user filesystem/network isolation and custom-overlay testing remain separate tasks. |
 
 Release preparation now deliberately fails if the required repository settings
@@ -54,8 +54,12 @@ Installed upgrade preservation, fresh runtime provisioning, host `curl`/`gh`
 remediation, and desktop acceptance are recorded in
 [the security-candidate validation record](VALIDATION.md#security-candidate-acceptance--2026-10-22).
 After the reported 61/61 stall and recovery, the user confirmed a clean fresh
-browser login and completed match with graphics/audio. Hosted release/rebuild
-verification and new-release authenticated upgrade remain outstanding.
+browser login and completed match with graphics/audio. The published v0.4.1
+release at `06345c9bb9a5c2502770fca34aec3e45f3eaed9d` passed hosted and local exact
+rebuild comparison, artifact authentication, and a real authenticated upgrade.
+See [the published validation record](VALIDATION.md#published-v041-verification--2026-10-22).
+The hosted token can check only public protection metadata; the owner's full
+no-bypass audit passed before release approval, as required by the release guide.
 
 ## Current incident comparison
 
