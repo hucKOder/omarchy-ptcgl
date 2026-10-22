@@ -1,0 +1,15 @@
+# Ownership and review routing. The solo-maintainer policy does not require an
+# impossible second-person approval; CI and the release environment are enforced.
+/.github/ @hucKOder
+/bootstrap.sh @hucKOder
+/install.sh @hucKOder
+/Makefile @hucKOder
+/go.mod @hucKOder
+/go.sum @hucKOder
+/cmd/ @hucKOder
+/scripts/ @hucKOder
+/internal/app/ @hucKOder
+/plugin/ @hucKOder
+/manifest.json @hucKOder
+/README.md @hucKOder
+/docs/RELEASES.md @hucKOder

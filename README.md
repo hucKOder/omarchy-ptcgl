@@ -50,6 +50,12 @@ terminals while the layout changes.*
 
 ## Install
 
+Use an updated system trust store before the download command. For the October
+2026 eMudhra incident, Arch's fixed CA package is `ca-certificates-mozilla`
+`3.131.1-1` or newer. GitHub CLI `2.102.1` built with Go `1.27.3` is tested.
+The initial `curl` download and GitHub CLI use their own TLS verification paths;
+updating the launcher alone does not update those tools.
+
 On **x86-64 Omarchy** with Lua Hyprland configuration (0.55+), working
 XWayland/Vulkan, and **8 GB free**, paste this into a terminal as your normal user:
 
@@ -101,7 +107,7 @@ bash ./install.sh --local
 ```
 
 Replace `FULL_40_HEX_COMMIT` with the source revision you intend to build.
-`make install` runs the explicit local installation flow. Local builds need Go 1.24+
+`make install` runs the explicit local installation flow. Local builds need Go 1.27.3+
 and Make; the installer adds them through Omarchy when needed.
 
 Prefer the terminal? Setup and launch are also available separately:
@@ -264,8 +270,15 @@ library for built-in MSI verification. Build and verify it with:
 ```bash
 make check
 make test
+make check-shell
+make security
 make build
 ```
+
+The security candidate requires Go 1.27.3 or later to include compromised-CA
+rejection. `make security` checks module integrity and reachable vulnerabilities
+with that selected build toolchain. `make check-shell` requires ShellCheck.
+See the [security audit and patch status](docs/SECURITY-AUDIT.md).
 
 With dependencies already installed, `make install-launcher` installs your local
 build and refreshes desktop integration without running game setup.
@@ -274,6 +287,11 @@ Version tags trigger the release workflow, which runs the checks, generates
 release-specific installation instructions, and publishes the attested installer,
 manifest, and Linux x86-64 launcher. Release installation needs neither Go nor
 Make nor a repository clone.
+
+Publication also requires protected release settings and an independent rebuild
+matching the launcher's exact bytes. Maintainers must configure the protections
+described in [the release guide](docs/RELEASES.md#required-github-release-settings)
+before the new workflow can publish.
 
 Tests cover the release installer, generated bootstrap instructions, verified
 downloads, archive extraction, update locking, prefix preservation, callback

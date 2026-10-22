@@ -12,6 +12,8 @@ import (
 	"encoding/binary"
 	"io"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -164,8 +166,13 @@ func TestBuiltInMSIVerification(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	caTemplate := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: pokemonPublisher},
 		NotBefore: now.Add(-365 * 24 * time.Hour), NotAfter: now.Add(365 * 24 * time.Hour),
-		IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
+		IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign}
 	ca := testCertificate(t, key, caTemplate, caTemplate)
+	crl := testCRL(t, ca, key, &x509.RevocationList{
+		Number: big.NewInt(1), ThisUpdate: now.Add(-time.Hour), NextUpdate: now.Add(time.Hour),
+	})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(crl) }))
+	defer server.Close()
 	roots := x509.NewCertPool()
 	roots.AddCert(ca)
 	for _, mode := range []string{"valid", "tampered", "unsigned", "untrusted", "wrong publisher", "lookalike publisher", "wrong organization", "wrong usage", "wrong key usage", "expired", "timestamped expired", "untrusted timestamp", "invalid timestamp usage", "future timestamp", "canceled"} {
@@ -174,7 +181,8 @@ func TestBuiltInMSIVerification(t *testing.T) {
 			leafTemplate := &x509.Certificate{SerialNumber: big.NewInt(2),
 				Subject:   pkix.Name{CommonName: pokemonPublisher, Organization: []string{pokemonPublisher}},
 				NotBefore: now.Add(-3 * 24 * time.Hour), NotAfter: now.Add(24 * time.Hour),
-				KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning}}
+				KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
+				CRLDistributionPoints: []string{server.URL}}
 			switch mode {
 			case "wrong publisher":
 				leafTemplate.Subject.CommonName = "Other Publisher"
@@ -194,7 +202,8 @@ func TestBuiltInMSIVerification(t *testing.T) {
 			if mode == "timestamped expired" || mode == "untrusted timestamp" || mode == "future timestamp" || mode == "invalid timestamp usage" {
 				tsaTemplate := &x509.Certificate{SerialNumber: big.NewInt(3), Subject: pkix.Name{CommonName: "Timestamp authority"},
 					NotBefore: now.Add(-365 * 24 * time.Hour), NotAfter: now.Add(365 * 24 * time.Hour),
-					KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping}}
+					KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+					CRLDistributionPoints: []string{server.URL}}
 				if mode != "invalid timestamp usage" {
 					tsaTemplate.ExtraExtensions = []pkix.Extension{{Id: asn1.ObjectIdentifier{2, 5, 29, 37}, Critical: true,
 						Value: crlDER(t, []asn1.ObjectIdentifier{pkcs9.OidKeyPurposeTimeStamping})}}
@@ -251,6 +260,7 @@ func TestVerificationWorkerNeedsNoLauncherConfiguration(t *testing.T) {
 }
 
 func TestMSIVerificationUsesBundledWorker(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "worker-test-placeholder")
 	a, r := testApp(t)
 	path := filepath.Join(t.TempDir(), "installer.msi")
 	writeTestFile(t, path, []byte{0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1})
@@ -261,5 +271,8 @@ func TestMSIVerificationUsesBundledWorker(t *testing.T) {
 	self, _ := os.Executable()
 	if len(r.commands) != 1 || r.commands[0].Name != self || strings.Join(r.commands[0].Args, "|") != "__verify-installer|"+path {
 		t.Fatalf("not using the bundled verifier: %+v", r.commands)
+	}
+	if r.commands[0].Env == nil || contains(r.commands[0].Env, "GITHUB_TOKEN=worker-test-placeholder") {
+		t.Fatal("MSI worker inherited developer credentials")
 	}
 }

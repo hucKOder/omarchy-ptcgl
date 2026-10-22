@@ -218,7 +218,7 @@ func (a *App) verifyInstaller(ctx context.Context, path string) error {
 	}
 	// Keep parsing in a child process so cancellation and the deadline can stop
 	// verification even if a malformed compound document stalls the parser.
-	_, err = a.Runner.Output(verifyCtx, Command{Name: self, Args: []string{"__verify-installer", path}})
+	_, err = a.Runner.Output(verifyCtx, Command{Name: self, Args: []string{"__verify-installer", path}, Env: environment(nil)})
 	if err != nil {
 		return fmt.Errorf("installer signature, certificate, or publisher verification failed")
 	}

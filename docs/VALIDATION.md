@@ -255,3 +255,95 @@ This verifies the published authentication path, isolated launcher installation,
 and real MSI verification. Actual package provisioning on clean Omarchy, a fresh
 full-game installation with v0.4.0, and new gameplay acceptance remain separate
 manual validation tasks.
+
+## Security-candidate acceptance — 2026-10-22
+
+Tested source based on `e6dcd334432ad1a091446e0db9e6527bb1526b87`, with the
+uncommitted security changes, as `0.4.1-security-candidate` using Go 1.27.3.
+The final installed candidate and security-only review checkout produced identical
+launcher bytes, SHA-256:
+
+```text
+02b4c2876fd0c07b4299668036c189553064a1077940645becd41cfcfa7415f8
+```
+
+This identifies the development candidate; a committed/tagged release has its own
+VCS metadata and requires hosted build comparison and artifact authentication.
+
+### Automated checks and targeted review fixes
+
+- Go formatting/vet/unit tests, race-enabled tests, module integrity,
+  ShellCheck, and actionlint passed. The full development checkout's companion
+  JavaScript and QML/manifest checks also passed.
+- Source-aware vulnerability analysis with Go 1.27.3 found zero reachable
+  vulnerabilities; 22 module-level findings with no imported affected packages
+  remain separate from reachable application findings.
+- Fixed two release-policy false positives from the saved independent review:
+  unresolved default-branch aliases are rejected, and required `test` and
+  `vulnerabilities` contexts must be bound to GitHub Actions app 15368.
+- Strengthened compromised-CA verification with public certificate-only fixtures,
+  explicit test roots, a fixed valid verification time, and the specific
+  compromised-key chain-filtering error. An offline comparison accepted both
+  fixtures with Go 1.27.2 and rejected both with Go 1.27.3. Optional real downloader
+  tests also passed with explicit test roots, so root removal cannot mask a
+  missing runtime key denylist.
+
+### Installed upgrade and real provisioning
+
+- Before installation, saved a private backup of the original launcher,
+  integration/state files, and game prefix. Evidence and backup are under
+  `~/.local/state/ptcgl-omarchy/release-acceptance-20261022/`, outside the checkout.
+- Installed the candidate through its actual self-installation command and
+  confirmed the installed binary hash. All diagnostics passed. Installation
+  preserved existing registry/settings, runtime selection, receipt, MIME settings,
+  and main/managed Hyprland configuration hashes.
+- The installed candidate downloaded and authenticated the current official MSI.
+  Its hash remained
+  `53bacfb0ecb71e10390bd8cd3cdc2ae75df67329a355e9d1413efb9680416a12`;
+  the update check preserved the receipt and registry hashes.
+- Fresh HOME/XDG directories with spaces exercised a real Proton download,
+  checksum verification, the new extractor, Steam Linux Runtime download and
+  integrity checks, prefix initialization, and authenticated MSI installation.
+  A second setup was a no-op and preserved the fresh receipt. System dependencies
+  were already installed; clean-OS package provisioning was not exercised.
+- Real desktop launch reached the existing signed-in home screen. The actual game
+  process excluded injected synthetic `GH_TOKEN`, `OPENAI_API_KEY`, and
+  `AWS_SECRET_ACCESS_KEY` variables while retaining its display environment.
+- Repeat launch focused the same PID. Maintenance was blocked before download
+  while playing. Tiling, resize/restoration, compositor-internal fullscreen and
+  restoration, and a workspace 1 → 9 → 1 round trip passed.
+- The installed companion detected the candidate as ready. Its Play command and
+  the app-menu entry both invoke `~/.local/bin/ptcgl-omarchy app`.
+
+### Host TLS tools and release configuration
+
+- Before remediation, active `curl` and GitHub CLI 2.102.0 (Go 1.27.1) accepted
+  the original-root compromised-CA test host. Both already rejected the alternate
+  test chain because its issuer was not trusted.
+- Authenticated and installed Arch's signed `ca-certificates-mozilla 3.131.1-1`
+  update. Updated the active GitHub CLI through mise to 2.102.1, built with Go
+  1.27.3; this respected the existing minimum-release-age policy. Its executable
+  matched the authenticated upstream archive. Both tools now reject both public
+  test hosts with certificate-verification failures.
+- Activated no-bypass rulesets explicitly protecting `main` and `v*` tags.
+  Configured the `release` environment for maintainer approval, no admin bypass,
+  and tag-only deployment. The real read-only policy check passed.
+- The owner confirmed this is a solo-maintainer project. PRs require CI and
+  resolved review threads with zero mandatory approvals; release approval is by
+  the owner with self-review allowed. This is not independent human review.
+
+### Login issue discovered during manual acceptance
+
+The user reported a login error, followed by initialization reaching 61/61 and
+stalling. A companion restart initially stalled again. Launching from the normal
+Omarchy app menu then reached the signed-in game, and a subsequent companion
+launch also worked. The installed binary remained the candidate identified above.
+
+No launcher root cause or corrective authentication patch has been established.
+The menu and companion use the same executable and `app` argument. Existing game
+exception logs predated the failing session and cannot explain this occurrence.
+On a subsequent explicit clean retry, the user confirmed successful fresh browser
+login/callback delivery and a completed online match with working graphics/audio.
+Retain the initial failure and recovery in this record; do not describe it as a
+confirmed source-level fix. Hosted release/rebuild verification and new-release
+authenticated upgrade remain outstanding.

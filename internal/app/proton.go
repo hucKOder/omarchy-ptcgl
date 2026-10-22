@@ -125,10 +125,13 @@ func (a *App) UpdateRuntime(ctx context.Context) error {
 	})
 }
 
-// Proton contains relative symlinks. Extract regular files first, then links;
-// this prevents later archive entries from writing through a symlink. Links
-// must remain inside the expected Proton tree. Devices and hardlinks are rejected.
+// Extract into a fresh, root-confined tree. Defer links until regular files and
+// all link parents exist, and validate the full link graph without cleaning away
+// ".." before expanding symlinks. Devices and hardlinks are rejected.
 func extractProton(ctx context.Context, archive, dest, expectedRoot string) error {
+	if expectedRoot == "" || expectedRoot == "." || expectedRoot == ".." || filepath.Base(expectedRoot) != expectedRoot {
+		return fmt.Errorf("invalid Proton directory")
+	}
 	f, err := os.Open(archive)
 	if err != nil {
 		return err
@@ -139,9 +142,23 @@ func extractProton(ctx context.Context, archive, dest, expectedRoot string) erro
 		return err
 	}
 	defer gz.Close()
+	destination, err := os.OpenRoot(dest)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+	if err := destination.Mkdir(expectedRoot, 0755); err != nil {
+		return err
+	}
+	tree, err := destination.OpenRoot(expectedRoot)
+	if err != nil {
+		return err
+	}
+	defer tree.Close()
 	tr := tar.NewReader(gz)
 	type link struct{ name, target string }
 	var links []link
+	targets := make(map[string]string)
 	var total int64
 	for {
 		if err := ctx.Err(); err != nil {
@@ -158,21 +175,24 @@ func extractProton(ctx context.Context, archive, dest, expectedRoot string) erro
 		if filepath.IsAbs(h.Name) || (name != expectedRoot && !strings.HasPrefix(name, expectedRoot+"/")) {
 			return fmt.Errorf("invalid archive path")
 		}
-		path := filepath.Join(dest, name)
+		path := strings.TrimPrefix(name, expectedRoot+"/")
+		if name == expectedRoot {
+			path = "."
+		}
 		switch h.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(path, 0755); err != nil {
+			if err := tree.MkdirAll(path, 0755); err != nil {
 				return err
 			}
 		case tar.TypeReg, tar.TypeRegA:
-			total += h.Size
-			if h.Size < 0 || total > 8<<30 {
+			if h.Size < 0 || h.Size > 8<<30-total {
 				return fmt.Errorf("Proton archive exceeds extraction limit")
 			}
-			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			total += h.Size
+			if err := tree.MkdirAll(filepath.Dir(path), 0755); err != nil {
 				return err
 			}
-			out, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, os.FileMode(h.Mode)&0777)
+			out, err := tree.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, os.FileMode(h.Mode)&0777)
 			if err != nil {
 				return err
 			}
@@ -185,21 +205,70 @@ func extractProton(ctx context.Context, archive, dest, expectedRoot string) erro
 				return closeErr
 			}
 		case tar.TypeSymlink:
-			target := filepath.Clean(filepath.Join(filepath.Dir(name), h.Linkname))
-			if filepath.IsAbs(h.Linkname) || (target != expectedRoot && !strings.HasPrefix(target, expectedRoot+"/")) {
-				return fmt.Errorf("archive symlink escapes Proton directory")
+			if path == "." || h.Linkname == "" || filepath.IsAbs(h.Linkname) {
+				return fmt.Errorf("invalid archive symlink")
 			}
+			if _, duplicate := targets[path]; duplicate {
+				return fmt.Errorf("duplicate archive symlink")
+			}
+			targets[path] = h.Linkname
 			links = append(links, link{path, h.Linkname})
 		default:
 			return fmt.Errorf("unsupported Proton archive entry type %d", h.Typeflag)
 		}
 	}
 	for _, l := range links {
-		if err := os.MkdirAll(filepath.Dir(l.name), 0755); err != nil {
+		if err := validateArchiveLink(ctx, l.name, targets); err != nil {
 			return err
 		}
-		if err := os.Symlink(l.target, l.name); err != nil {
+		// No symlinks exist yet. An archive link used as another entry's parent
+		// becomes a directory here and is rejected at link creation, not followed.
+		if err := tree.MkdirAll(filepath.Dir(l.name), 0755); err != nil {
 			return err
+		}
+	}
+	for _, l := range links {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := tree.Symlink(l.target, l.name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Resolve components in filesystem order, including links whose targets do not
+// exist yet. EvalSymlinks cannot validate dangling links, and filepath.Clean
+// incorrectly treats "link/.." as lexical rather than following link first.
+func validateArchiveLink(ctx context.Context, name string, links map[string]string) error {
+	pending := strings.Split(filepath.Dir(name)+"/"+links[name], "/")
+	var resolved []string
+	expansions := 0
+	for len(pending) > 0 {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		part := pending[0]
+		pending = pending[1:]
+		switch part {
+		case "", ".":
+			continue
+		case "..":
+			if len(resolved) == 0 {
+				return fmt.Errorf("archive symlink escapes Proton directory")
+			}
+			resolved = resolved[:len(resolved)-1]
+		default:
+			resolved = append(resolved, part)
+			if target, ok := links[strings.Join(resolved, "/")]; ok {
+				expansions++
+				if expansions > 40 {
+					return fmt.Errorf("archive symlink cycle or excessive link depth")
+				}
+				resolved = resolved[:len(resolved)-1]
+				pending = append(strings.Split(target, "/"), pending...)
+			}
 		}
 	}
 	return nil

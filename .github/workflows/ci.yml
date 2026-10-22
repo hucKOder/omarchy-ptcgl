@@ -2,6 +2,9 @@ name: Go
 on:
   push:
   pull_request:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,9 +18,9 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: stable
+          go-version-file: go.mod
           cache: false
-      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - run: make security
   test:
     runs-on: ubuntu-latest
     steps:
@@ -28,6 +31,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - run: make check-shell
       - run: make check
       - run: make test
       - run: make build

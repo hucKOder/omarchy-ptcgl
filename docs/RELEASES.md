@@ -32,9 +32,11 @@ verification, with dependencies pinned by `go.mod`/`go.sum`. CIRCL is explicitly
 pinned to v1.6.3 to include fixes absent from Relic's original dependency set.
 Verification checks the MSI content digest, signature, code-signing certificate
 chain, timestamp signature/chain when present, and the primary signer's exact
-Pokémon publisher identity. Publisher and timestamp certificates' advertised CRLs
-are fetched and checked for issuer signatures, freshness, scope, and revocation;
-unavailable or invalid revocation data stops verification. Delta, indirect, and
+Pokémon publisher identity. In the security candidate, every non-root certificate
+in an accepted publisher or timestamp chain must advertise a usable CRL. Those
+CRLs are checked for issuer signatures, freshness, scope, and revocation;
+missing, unavailable, or invalid revocation evidence stops verification. Alternate
+X.509 paths are tried until one complete non-revoked chain succeeds. Delta, indirect, and
 reason-restricted CRLs are rejected rather than assumed to cover the signer.
 System certificate authorities are used; embedded
 certificates do not become trusted roots. A private child process bounds
@@ -42,6 +44,13 @@ verification with a two-minute deadline. No external verifier or AUR package is
 needed. This removes the AUR packaging trust boundary; it is not a claim that
 the replacement library is vulnerability-free. Release maintenance includes
 dependency vulnerability checks and negative verification tests.
+
+The security candidate raises the build minimum to Go 1.27.3, including the
+compromised-public-key distrust fix for GO-2026-6809 / CVE-2026-111943. Previously
+published v0.4.0 bytes still contain Go 1.27.2. The patched source must be built
+and published as a new version; neither source changes nor an updated compiler
+repair an already-installed binary. `curl`, `gh`, and the initial source bootstrap
+have separate trust paths that must also be assessed on the installation host.
 
 ## Trust model
 
@@ -167,15 +176,21 @@ locations are fixed by the installer rather than supplied by that manifest.
 
 1. Review and commit the release source, including bootstrap, installer, dependency
    pins, tests, and workflow. After dependency changes, run `make licenses` to
-   refresh the notices embedded in the binary. Run `make check`, `make test`, and `make build`, plus
-   `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...` with a supported Go toolchain.
+   refresh the notices embedded in the binary. Run `make check`, `make test`,
+   `make check-shell`, `make security`, and `make build` with the patched toolchain
+   selected by `go.mod`. Vulnerability checks also run daily between releases.
 2. Select a new version and record its source commit. Create and push its tag when
    ready to publish. The tag must identify the reviewed commit; protect release
    tags and workflow changes using repository access controls.
-3. The read-only build job tests the source and builds the versioned launcher.
+3. The read-only policy job requires the tag's commit to be in CI-protected `main`
+   history and checks the settings below. The read-only build job tests the source
+   and builds the versioned launcher.
    `scripts/release-assets.sh` packages it with the installer, manifest, and
-   complete release-specific installation notes. The
-   privileged publish job downloads these assets without executing project code,
+   complete release-specific installation notes. A second, cache-free checkout
+   rebuilds with the same exact Go version and compares the launcher and installer
+   bytes. Its downloaded comparison assets stay under ignored `build/` so they do
+   not change the rebuild's VCS dirty stamp. The privileged publish job uses the
+   protected `release` environment and downloads these assets without executing project code,
    validates their hashes, generates attestations, and verifies them with the same
    identity policy before publishing. It uses the generated notes as data and
    does not execute project code to produce release instructions.
@@ -188,12 +203,60 @@ The release workflow requires `contents: write`, `id-token: write`, and
 without a custom signing secret. Actions are pinned to commit IDs; review both
 their upstream changes and the pinned IDs when updating them.
 
+### Required GitHub release settings
+
+These repository settings are external to the source patch. Configure them before
+publishing; `scripts/check-release-policy.sh` fails closed while they are missing.
+It uses read-only ruleset/environment APIs, not a stored administration token.
+
+- An **active branch ruleset** explicitly covering `refs/heads/main` (or all
+  branches), with no excluded refs or bypass actors. An unresolved
+  `~DEFAULT_BRANCH` alias does not satisfy the check. Require PRs with zero
+  mandatory approvals, no mandatory code-owner or last-push approval, stale-approval
+  dismissal, resolved review threads, and up-to-date checks named `test` and `vulnerabilities`, each bound
+  to the GitHub Actions integration (`integration_id: 15368`). Prevent
+  force-pushes and deletion. Classic branch protection alone does not satisfy
+  this policy check.
+- An **active tag ruleset** covering `refs/tags/v*` (or all tags), with no excluded
+  refs or bypass actors, preventing tag updates and deletion. New tags remain
+  possible; the workflow separately requires their source in `main` history.
+- A **`release` environment** requiring approval by `@hucKOder`, permitting
+  self-review, disabling administrator bypass, and allowing only tags matching
+  `v*` through custom deployment restrictions.
+- `.github/CODEOWNERS` records ownership and routes optional reviews. The project
+  currently has one maintainer; requiring a second person's PR or release
+  approval would make its release process unusable. The enforced policy therefore
+  requires CI-tested PRs and explicit approval by the maintainer, not independent
+  human review. These controls do not prevent a compromised sole-maintainer account
+  from approving malicious source or releases. If another maintainer joins, revise
+  the policy, settings, fixtures, and documentation together.
+
+The policy gate validates these concrete settings, not every possible equivalent
+GitHub configuration. Its fixtures exercise accepted settings and rejection of
+missing PR/CI, unbound or wrong-source checks, bypass actors, mutable/excluded tags,
+unusable solo-maintainer approval settings, unexpected reviewers,
+administrator release bypass, unexpected
+repository/ref, API failures, and branch-enabled deployments.
+
+The second rebuild is an independent runner execution within the same repository
+trust domain. It detects an artifact/source mismatch under the reviewed workflow;
+an account capable of rewriting the workflow or protections remains a threat.
+Keep independently established source pins and preserve GitHub audit/release logs.
+
 Existing releases are not overwritten by the workflow. Recover from an invalid or
 compromised release by announcing the affected version/commit and publishing a new
 reviewed version. An old valid attestation is not automatically revoked: users
 must avoid explicitly selecting the affected commit. Keep a previously verified
 installer/release selection for recovery; earlier binaries can be reinstalled
 through the same verification procedure.
+
+For an incident, pause publication, preserve workflow/artifact/provenance evidence,
+identify the affected versions, commits, and digests, and publish an explicit
+advisory. Revoke exposed maintainer credentials from a clean environment, review
+protection/workflow changes, and rebuild a new reviewed version. A valid signature
+or attestation on malicious bytes remains valid cryptographically; withdrawing a
+release or issuing an advisory does not automatically revoke every cached copy.
+Users need explicit affected-version guidance and a verified recovery release.
 
 ## Verification coverage
 

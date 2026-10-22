@@ -13,6 +13,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  policy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Require CI-protected main history
+        run: git merge-base --is-ancestor HEAD refs/remotes/origin/main
+      - name: Require release protections
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/check-release-policy.sh
   vulnerabilities:
     runs-on: ubuntu-latest
     steps:
@@ -21,21 +37,25 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: stable
+          go-version-file: go.mod
           cache: false
-      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - run: make security
   build:
     runs-on: ubuntu-latest
     outputs:
       artifact-id: ${{ steps.assets.outputs.artifact-id }}
+      go-version: ${{ steps.go.outputs.go-version }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        id: go
         with:
-          go-version: stable
+          go-version-file: go.mod
           cache: false
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - run: make check-shell
       - run: make check
       - run: make test
       - name: Build versioned release assets
@@ -52,9 +72,32 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-  publish:
-    needs: [build, vulnerabilities]
+  reproduce:
+    needs: build
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: ${{ needs.build.outputs.go-version }}
+          cache: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          merge-multiple: true
+          path: build/expected
+      - name: Independently rebuild and compare exact launcher bytes
+        run: |
+          make build VERSION="${GITHUB_REF_NAME#v}"
+          cmp build/ptcgl-omarchy build/expected/ptcgl-omarchy-linux-amd64
+          cmp install.sh build/expected/install.sh
+
+  publish:
+    needs: [policy, build, vulnerabilities, reproduce]
+    runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: write
       id-token: write

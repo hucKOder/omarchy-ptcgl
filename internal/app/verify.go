@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/asn1"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -96,11 +97,45 @@ func verifyCertificate(ctx context.Context, sig pkcs7.Signature, roots *x509.Cer
 	if err != nil {
 		return err
 	}
-	// Like the previous verifier, check current revocation information even for
-	// a timestamped certificate whose validity is evaluated at signing time.
-	issuer := chains[0][0]
-	if len(chains[0]) > 1 {
-		issuer = chains[0][1]
+	return verifyChainRevocation(ctx, chains)
+}
+
+// Certificate.Verify does not check revocation. Require current evidence for
+// every non-root certificate, even when validity was evaluated at signing time.
+// A cross-signed intermediate may have several paths: one complete, non-revoked
+// path is sufficient. Trust anchors are maintained by the system trust store.
+func verifyChainRevocation(ctx context.Context, chains [][]*x509.Certificate) error {
+	type pair struct{ certificate, issuer string }
+	checked := make(map[pair]error)
+	var failures []error
+	for _, chain := range chains {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if len(chain) == 0 {
+			continue
+		}
+		var chainErr error
+		for i := 0; i+1 < len(chain); i++ {
+			cert, issuer := chain[i], chain[i+1]
+			key := pair{string(cert.Raw), string(issuer.Raw)}
+			err, found := checked[key]
+			if !found {
+				err = verifyRevocation(ctx, cert, issuer)
+				checked[key] = err
+			}
+			if err != nil {
+				chainErr = fmt.Errorf("certificate %q: %w", cert.Subject.CommonName, err)
+				break
+			}
+		}
+		if chainErr == nil {
+			return ctx.Err()
+		}
+		failures = append(failures, chainErr)
 	}
-	return verifyRevocation(ctx, cert, issuer)
+	if len(failures) == 0 {
+		return fmt.Errorf("no certificate chain to check")
+	}
+	return fmt.Errorf("no certificate chain has complete revocation evidence: %w", errors.Join(failures...))
 }

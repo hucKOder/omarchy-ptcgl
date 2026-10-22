@@ -19,7 +19,7 @@ var errRevoked = errors.New("signing certificate has been revoked")
 
 func verifyRevocation(ctx context.Context, cert, issuer *x509.Certificate) error {
 	if len(cert.CRLDistributionPoints) == 0 {
-		return nil
+		return fmt.Errorf("certificate has no CRL distribution point")
 	}
 	var lastErr error
 	for _, point := range cert.CRLDistributionPoints {

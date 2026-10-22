@@ -74,11 +74,15 @@ func (r OSRunner) Start(c Command) error {
 	return nil
 }
 
+// Only inherit settings needed by the desktop and compatibility runtime. In
+// particular, developer/cloud/model credentials and loader injection settings
+// must not flow from a terminal or coding agent into downloaded executables.
+// This is not a filesystem sandbox: Wine still runs with the user's privileges.
 func environment(values map[string]string) []string {
 	env := make([]string, 0, len(os.Environ())+len(values))
 	for _, entry := range os.Environ() {
 		key, _, _ := strings.Cut(entry, "=")
-		if _, replace := values[key]; !replace {
+		if _, replace := values[key]; !replace && runtimeVariable(key) {
 			env = append(env, entry)
 		}
 	}
@@ -86,6 +90,35 @@ func environment(values map[string]string) []string {
 		env = append(env, key+"="+value)
 	}
 	return env
+}
+
+func runtimeVariable(key string) bool {
+	switch key {
+	case "HOME", "USER", "LOGNAME", "PATH", "SHELL", "TMPDIR", "LANG", "LANGUAGE", "TZ",
+		"LC_ALL", "LC_ADDRESS", "LC_COLLATE", "LC_CTYPE", "LC_IDENTIFICATION", "LC_MEASUREMENT",
+		"LC_MESSAGES", "LC_MONETARY", "LC_NAME", "LC_NUMERIC", "LC_PAPER", "LC_TELEPHONE", "LC_TIME",
+		"DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "DBUS_SESSION_BUS_ADDRESS",
+		"XDG_RUNTIME_DIR", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME",
+		"XDG_DATA_DIRS", "XDG_CONFIG_DIRS", "XDG_CURRENT_DESKTOP", "XDG_SESSION_DESKTOP",
+		"XDG_SESSION_TYPE", "XDG_SESSION_ID", "XDG_SEAT", "XDG_VTNR", "DESKTOP_SESSION",
+		"HYPRLAND_INSTANCE_SIGNATURE", "PULSE_SERVER", "PULSE_SINK", "PULSE_SOURCE",
+		"PIPEWIRE_REMOTE", "ALSA_CONFIG_PATH", "SDL_AUDIODRIVER", "SDL_VIDEODRIVER",
+		"SDL_GAMECONTROLLERCONFIG", "SDL_GAMECONTROLLERCONFIG_FILE",
+		"VK_ICD_FILENAMES", "VK_DRIVER_FILES", "VK_ADD_DRIVER_FILES", "VK_LAYER_PATH",
+		"VK_IMPLICIT_LAYER_PATH", "VK_INSTANCE_LAYERS", "VK_LOADER_DRIVERS_SELECT",
+		"VK_LOADER_DRIVERS_DISABLE", "DRI_PRIME", "MESA_LOADER_DRIVER_OVERRIDE",
+		"MESA_VK_DEVICE_SELECT", "MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE",
+		"__NV_PRIME_RENDER_OFFLOAD", "__GLX_VENDOR_LIBRARY_NAME", "__VK_LAYER_NV_optimus",
+		"__GL_VRR_ALLOWED", "__GL_GSYNC_ALLOWED", "GBM_BACKEND", "LIBVA_DRIVER_NAME",
+		"PROTON_LOG", "PROTON_NO_ESYNC", "PROTON_NO_FSYNC", "PROTON_USE_WINED3D",
+		"PROTON_ENABLE_NVAPI", "PROTON_HIDE_NVIDIA_GPU", "PROTON_ENABLE_WAYLAND",
+		"WINEDEBUG", "WINEESYNC", "WINEFSYNC", "UMU_LOG", "UMU_RUNTIME_UPDATE",
+		"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
+		"http_proxy", "https_proxy", "all_proxy", "no_proxy",
+		"SSL_CERT_FILE", "SSL_CERT_DIR":
+		return true
+	}
+	return false
 }
 
 var ErrBusy = errors.New("game or maintenance operation is running; close the game and retry")
