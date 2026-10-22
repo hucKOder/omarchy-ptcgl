@@ -60,6 +60,8 @@ an error dialog. Close the game before using these maintenance actions.
   download; partial HTTP resume is deliberately not implemented.
 - GE-Proton archives are checked against a pinned SHA-256 and extracted into a
   staging directory before the completed runtime is published.
+- The security candidate confines extraction to a fresh filesystem root and
+  checks complete relative-symlink chains, including dangling targets and cycles.
 - Installation receipts are advanced only after Windows Installer succeeds
   and the game executable exists.
 - A failed MSI invocation can partially change installer-managed files. Run
@@ -92,6 +94,32 @@ make install-launcher
 
 The executable is replaced atomically and desktop integration is refreshed.
 The application's game prefix and previously selected runtime are retained.
+
+### Security-candidate behavior
+
+The 2026-10-22 bulk patch requires Go 1.27.3+, checks current revocation evidence
+for every non-root publisher/timestamp certificate, and rejects a chain with
+missing CRL distribution points. A valid alternate chain can still succeed. The
+candidate passed installed-launcher preservation, official MSI verification, fresh
+isolated provisioning, and user-confirmed fresh login/gameplay acceptance. The
+validation record also retains an initial 61/61 login stall and recovery without
+claiming a confirmed launcher cause or authentication-code fix.
+
+Game, setup, maintenance, callback, and MSI-verifier subprocesses inherit an
+explicit environment allowlist rather than every terminal variable. Display,
+XDG paths, locale, audio, selected graphics/runtime settings, proxy settings,
+and certificate-store paths are retained. Unknown variables, developer/cloud/model
+credentials, `LD_PRELOAD`, and `LD_LIBRARY_PATH` are not forwarded. Callback log
+suppression remains explicit. Review custom graphics overlays and unusual runtime
+overrides during closed-game acceptance, because unlisted overrides are dropped.
+
+This filtering is not a sandbox. The runtime and game still have the normal
+user's filesystem access; required proxy/display settings can themselves carry
+sensitive connection information. A dedicated Wine prefix separates game state,
+not operating-system permissions.
+
+Build/test work can proceed during gameplay. Apply the launcher update and run
+integration, runtime, browser, and game smoke tests after the active session ends.
 
 ## Compatibility-runtime updates and rollback
 

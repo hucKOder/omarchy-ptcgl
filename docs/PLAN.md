@@ -27,9 +27,69 @@ delivery, tiled startup, resizing, and repeat-launch focus are recorded in
   launcher-only upgrade using the published installation block. The installed
   binary matched the published digest and all 16 diagnostics passed.
 
+## Security priority — 2026-10-22
+
+The [security audit and current-incident comparison](SECURITY-AUDIT.md) takes
+priority over installation QoL and companion marketplace publication. It relates
+the PHP2Shell, GitLab, eMudhra, and LiteLLM incidents to this project's actual
+input, certificate, credential, and release boundaries. The PHP/GitLab CVEs do
+not directly apply; certificate trust and supply-chain compromise do.
+
+During active gameplay, use source-only work, developer tooling, read-only
+queries, and isolated fixtures. Schedule deployment and game-touching acceptance
+after the current session exits.
+
+- [x] Review current source, published artifact provenance, and repository release
+  controls. Reproduce revoked-intermediate acceptance, transitive archive-link
+  escape, and synthetic runtime credential inheritance in isolated fixtures.
+- [x] Enable and verify Go/Bash LSP diagnostics in OpenCode, with user-local Bash
+  LSP and ShellCheck tooling. Record existing shell diagnostics and the upstream
+  developer-only dependency advisory in the audit.
+- [x] **P0 source — SEC-02:** require Go 1.27.3+ in `go.mod`, build a separate
+  security candidate, and verify compromised-key rejection through the actual
+  downloader TLS path against both original-root and cross-signed test hosts.
+  A new published/installed binary remains part of release acceptance.
+- [x] Separately assess `curl`/`gh` trust paths and installation-host trust-store
+  updates. Both initially accepted the original-root compromised-CA test host;
+  the signed Arch CA update and patched active GitHub CLI now reject both hosts.
+  The initial HTTPS source bootstrap remains an explicit trust boundary.
+- [x] **P0 source — SEC-01:** check revocation across every non-root certificate in an
+  accepted publisher/timestamp chain. Add regressions for revoked intermediates,
+  missing/unavailable evidence, alternate chains, and valid timestamped installers.
+  The candidate also passed read-only verification of the cached official MSI.
+- [x] **P1 source — SEC-04:** prepare CODEOWNERS, a fail-closed ruleset/environment
+  policy check, reviewed-main ancestry checking, and a separate-runner byte-for-byte
+  rebuild gate. Negative fixtures cover weak/missing protection settings.
+- [x] **P1 settings activation — SEC-04:** protect `main`, release tags, and publishing
+  with the documented solo-maintainer policy, CI-bound required checks, no bypass,
+  and an owner-approved tag-only `release` environment. The real policy check passes.
+- [ ] Validate the policy job's hosted token/API access and separate-runner rebuild
+  in GitHub. The solo-maintainer process does not provide independent human review.
+- [x] **P1 source — SEC-05:** constrain game/runtime and MSI-worker environments; verify that
+  synthetic GitHub/cloud/model credentials are excluded from play, setup,
+  maintenance, and callbacks while required desktop/runtime settings survive.
+  Document that a Wine prefix does not isolate same-user credential files.
+- [x] **P1 source — SEC-03:** confine archive operations with `os.Root`, validate the
+  complete link graph before link creation, and retain checksum pinning. Cover
+  transitive and dangling escapes, cycles, valid relative chains, and dangling links.
+- [x] **P1 source:** schedule daily read-only vulnerability checks using the declared
+  build toolchain and document compromised-but-authentic release recovery. Existing
+  installer fixtures retain source/workflow/repository mismatch rejection.
+- [x] Fix the existing ShellCheck warnings and add `make check-shell` to CI/releases.
+- [ ] **P2:** investigate verifier memory budgets and malformed-input lifecycle
+  fuzzing; track the developer-only Bash LSP `braces` advisory and filesystem/network
+  sandboxing separately from environment filtering.
+- [x] Validate the installed candidate's real MSI verification, upgrade preservation,
+  fresh isolated runtime/game provisioning, and automated desktop behavior.
+- [x] Recheck fresh browser login and gameplay after the reported 61/61 login stall.
+  The user confirmed a clean fresh login and completed match with graphics/audio;
+  the initial failure/recovery remains recorded without a confirmed launcher cause.
+- [ ] Publish a new security patch release with verified provenance and build comparison.
+
 ## Installation follow-up
 
-Installation simplification takes priority over the remaining launcher QoL work.
+After the security priority above, installation simplification takes priority
+over the remaining launcher QoL work.
 See [the installation plan](INSTALLATION-PLAN.md) for dependencies, implementation
 tasks, and release acceptance criteria:
 
@@ -150,6 +210,11 @@ Included in the installation plan's setup-progress work.
 - Callback delivery uses the active session and suppresses secret-bearing output.
 - Repeated integration is idempotent; invalid Hyprland rules roll back.
 - A launcher upgrade retains the previously selected runtime profile.
+- Security regression tests reject revoked publisher/timestamp intermediates and
+  transitively escaping archive links, and constrain inherited runtime secrets.
+- Source-aware vulnerability analysis passes with the release build's supported,
+  patched Go toolchain. Published artifacts identify that toolchain and match
+  reviewed source and an independent clean build.
 
 ## Real-system acceptance checks
 
