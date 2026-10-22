@@ -25,10 +25,10 @@ jobs:
           fetch-depth: 0
       - name: Require CI-protected main history
         run: git merge-base --is-ancestor HEAD refs/remotes/origin/main
-      - name: Require release protections
+      - name: Require public release-protection metadata
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash scripts/check-release-policy.sh
+        run: bash scripts/check-release-policy.sh --public-metadata
   vulnerabilities:
     runs-on: ubuntu-latest
     steps:

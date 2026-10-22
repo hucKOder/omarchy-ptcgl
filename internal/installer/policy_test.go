@@ -14,7 +14,7 @@ func TestReleasePolicyFailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, mode := range []string{"protected", "wrong repository", "wrong ref", "API failure", "admin bypass", "default branch alias", "no review", "unmergeable self review", "stale approvals", "unresolved conversations", "no CI", "unbound CI", "wrong CI integration", "mutable tags", "tag bypass", "excluded tags", "unprotected environment", "self approval blocked", "wrong release reviewer", "admin release bypass", "branch deployment"} {
+	for _, mode := range []string{"protected", "wrong repository", "wrong ref", "API failure", "admin bypass", "default branch alias", "no review", "unmergeable self review", "stale approvals", "unresolved conversations", "no CI", "unbound CI", "wrong CI integration", "mutable tags", "tag bypass", "excluded tags", "unprotected environment", "self approval blocked", "wrong release reviewer", "admin release bypass", "branch deployment", "hidden bypass", "public hidden bypass", "public admin bypass", "public tag bypass", "public no CI", "unknown option"} {
 		t.Run(mode, func(t *testing.T) {
 			root := t.TempDir()
 			bin := filepath.Join(root, "bin")
@@ -22,7 +22,7 @@ func TestReleasePolicyFailsClosed(t *testing.T) {
 				"target": "branch", "enforcement": "active", "bypass_actors": []any{},
 				"conditions": map[string]any{"ref_name": map[string]any{"include": []string{"refs/heads/main"}, "exclude": []string{}}},
 			}
-			if mode == "admin bypass" {
+			if mode == "admin bypass" || mode == "public admin bypass" {
 				main["bypass_actors"] = []any{map[string]any{"actor_type": "RepositoryRole", "actor_id": 5}}
 			}
 			if mode == "default branch alias" {
@@ -40,7 +40,7 @@ func TestReleasePolicyFailsClosed(t *testing.T) {
 					"required_review_thread_resolution": mode != "unresolved conversations",
 				}})
 			}
-			if mode != "no CI" {
+			if mode != "no CI" && mode != "public no CI" {
 				checks := []any{map[string]any{"context": "test", "integration_id": 15368}, map[string]any{"context": "vulnerabilities", "integration_id": 15368}}
 				if mode == "unbound CI" {
 					delete(checks[0].(map[string]any), "integration_id")
@@ -62,11 +62,15 @@ func TestReleasePolicyFailsClosed(t *testing.T) {
 			if mode == "mutable tags" {
 				ruleset["rules"] = []any{}
 			}
-			if mode == "tag bypass" {
+			if mode == "tag bypass" || mode == "public tag bypass" {
 				ruleset["bypass_actors"] = []any{map[string]any{"actor_type": "RepositoryRole", "actor_id": 5}}
 			}
 			if mode == "excluded tags" {
 				ruleset["conditions"] = map[string]any{"ref_name": map[string]any{"include": []string{"refs/tags/v*"}, "exclude": []string{"refs/tags/v0.*"}}}
+			}
+			if mode == "hidden bypass" || mode == "public hidden bypass" {
+				delete(main, "bypass_actors")
+				delete(ruleset, "bypass_actors")
 			}
 			reviewer := "hucKOder"
 			if mode == "wrong release reviewer" {
@@ -124,12 +128,19 @@ exec cat -- "$TEST_POLICY/$name.json"
 			if mode == "wrong ref" {
 				ref = "refs/heads/main"
 			}
-			cmd := exec.Command("bash", "-e")
+			args := []string{"-e", "-s", "--"}
+			if strings.HasPrefix(mode, "public ") {
+				args = append(args, "--public-metadata")
+			}
+			if mode == "unknown option" {
+				args = append(args, "--ignore-protections")
+			}
+			cmd := exec.Command("bash", args...)
 			cmd.Stdin = strings.NewReader(string(script))
 			cmd.Env = append(os.Environ(), "PATH="+bin, "TEST_POLICY="+root, "TEST_MODE="+mode,
 				"GITHUB_REPOSITORY="+repo, "GITHUB_EVENT_NAME=push", "GITHUB_REF="+ref)
 			output, err := cmd.CombinedOutput()
-			if (err == nil) != (mode == "protected") {
+			if (err == nil) != (mode == "protected" || mode == "public hidden bypass") {
 				t.Fatalf("policy result = %v\n%s", err, output)
 			}
 		})

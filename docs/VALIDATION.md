@@ -347,3 +347,18 @@ login/callback delivery and a completed online match with working graphics/audio
 Retain the initial failure and recovery in this record; do not describe it as a
 confirmed source-level fix. Hosted release/rebuild verification and new-release
 authenticated upgrade remain outstanding.
+
+### First hosted release-candidate run
+
+The immutable `v0.4.1-rc.1` tag identifies
+`0bb59ce851e52c0b9b23f767d399a978eff3e1ee`.
+[Its workflow](https://github.com/hucKOder/omarchy-ptcgl/actions/runs/39778213696)
+passed vulnerability analysis, build/tests, and separate-runner exact rebuild.
+The policy job failed closed because GitHub hides `bypass_actors` from its
+read-only token; publishing was skipped and no RC release assets were published.
+
+The follow-up explicitly distinguishes the hosted public-metadata gate from the
+owner's default full policy audit. The owner must pass that full audit, including
+visible empty bypass lists, before release-environment approval. Regression
+fixtures cover hidden lists, rejection of known bypass actors in either mode,
+missing CI, and unknown options. The failed tag is retained rather than moved.
