@@ -183,7 +183,9 @@ locations are fixed by the installer rather than supplied by that manifest.
    ready to publish. The tag must identify the reviewed commit; protect release
    tags and workflow changes using repository access controls.
 3. The read-only policy job requires the tag's commit to be in CI-protected `main`
-   history and checks the settings below. The read-only build job tests the source
+   history and checks public protection metadata. GitHub hides bypass lists from
+   its token; the owner must run the full local policy check before approving
+   the release environment. The read-only build job tests the source
    and builds the versioned launcher.
    `scripts/release-assets.sh` packages it with the installer, manifest, and
    complete release-specific installation notes. A second, cache-free checkout
@@ -207,7 +209,22 @@ their upstream changes and the pinned IDs when updating them.
 
 These repository settings are external to the source patch. Configure them before
 publishing; `scripts/check-release-policy.sh` fails closed while they are missing.
-It uses read-only ruleset/environment APIs, not a stored administration token.
+The hosted `--public-metadata` mode checks the visible ruleset/environment fields
+without storing an administration token. GitHub intentionally hides
+`bypass_actors` unless the caller can write rulesets. Before approving the release
+environment, use the owner's normal authenticated GitHub CLI to run the default
+full check, which rejects unavailable or nonempty bypass lists:
+
+```sh
+GITHUB_REPOSITORY=hucKOder/omarchy-ptcgl \
+GITHUB_EVENT_NAME=push GITHUB_REF=refs/tags/v0.4.1 \
+bash scripts/check-release-policy.sh
+```
+
+Set the ref to the selected release tag. Verify its source commit and successful
+preparation jobs before approving. The hosted metadata pass alone does not
+establish the absence of bypass actors. Known nonempty bypass lists are rejected
+in both modes; missing lists are accepted only in explicit public-metadata mode.
 
 - An **active branch ruleset** explicitly covering `refs/heads/main` (or all
   branches), with no excluded refs or bypass actors. An unresolved
