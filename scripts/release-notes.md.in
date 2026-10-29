@@ -12,20 +12,24 @@ Source commit: `@SOURCE_COMMIT@`
 - Updated Go crypto dependencies; existing MSI authentication, patched Go trust,
   release protections, attestations, and independent rebuild gates are retained.
 
-## Release-candidate scope
+## Validation and known limits
 
-The v0.5.0 candidate is for opt-in testing, not stable promotion. Existing-installation
-desktop smoke testing passed, including startup/focus, measured downloads,
-diagnostics/report saving, and game survival through a shell restart. Fresh browser
-login, a completed match, real repair/interrupted-install recovery, vertical-bar
-layout, and clean-OS provisioning still need acceptance. See the
+Promoted from the tested v0.5.0-rc.1 without runtime behavior changes beyond version
+stamping. Existing-installation desktop smoke testing passed, including startup/focus,
+measured downloads, diagnostics/report saving, and game survival through a shell
+restart. The user confirmed the installed candidate's logout/browser-login and
+gameplay test and approved stable release. See the
 [validation record](https://github.com/hucKOder/omarchy-ptcgl/blob/@SOURCE_COMMIT@/docs/VALIDATION.md).
 
-Stable **v0.4.1 remains Latest**. The default bootstrap and companion's install/upgrade
-button select stable releases, not this candidate. Install the candidate explicitly
-using the pinned instructions below before enabling its companion. Do not use the
-stable-install button to upgrade or reinstall the candidate. Companion marketplace
-submission and stable promotion are separate follow-ups.
+Real repair/interrupted-install recovery, vertical-bar layout, and clean-OS
+provisioning remain unverified follow-ups accepted by the maintainer for this
+release. Automated fixture coverage is not a claim that those real-machine checks
+passed. Companion marketplace submission remains separate.
+
+The default bootstrap and companion's install/upgrade button select this stable
+release. Launcher v0.5.0 supplies the status schema required by the companion;
+its install/upgrade action no longer needs a prerelease pin. Close the game before
+installing or upgrading. Existing prefix and selected Proton runtime are retained.
 
 ## Install
 

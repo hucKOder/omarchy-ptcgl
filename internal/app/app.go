@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-var Version = "0.5.0-rc.1"
+var Version = "0.5.0"
 
 type App struct {
 	Paths    Paths
