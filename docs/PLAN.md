@@ -10,8 +10,9 @@ window. Use the official Windows client through UMU, GE-Proton, and XWayland.
 
 ### UX milestones 1–3 — implemented in the checkout, 2026-10-29
 
-Prepared for **v0.5.0-rc.1**, not stable promotion. Automated checks use fixtures
-and temporary HOME/XDG paths.
+Published as **v0.5.0-rc.1**, not stable promotion. Hosted release/rebuild,
+downloaded-artifact authentication, and isolated launcher-only installation passed.
+Stable v0.4.1 remains Latest. Automated checks use fixtures and temporary HOME/XDG paths.
 A matching candidate was subsequently tested on the real desktop and the original
 installation restored; see the [live acceptance record](VALIDATION.md).
 
@@ -28,11 +29,15 @@ installation restored; see the [live acceptance record](VALIDATION.md).
   launch/focus, download cancellation and MSI verification, cancelled repair,
   diagnostics/GUI report saving, fullscreen/resize/workspace behavior, both
   monitors, and game survival through shell restart. Original installation restored.
+- [x] Publish the opt-in v0.5.0-rc.1 candidate through protected main; verify exact
+  hosted/local rebuilds, all artifact attestations, pinned bootstrap installation,
+  isolated launcher-only reinstall preservation, and read-only official MSI verification.
 - [ ] Remaining desktop acceptance: vertical bar, slow/failing startup variants,
   fresh browser login and completed match, actual interrupted MSI/runtime recovery,
   changed-MSI application, and clipboard-copy behavior on the live desktop.
-- [ ] Clean-OS first-time tester and published-artifact acceptance before stable release
-  or companion marketplace submission. Preserve existing release security gates.
+- [ ] Clean-OS first-time tester before stable release or companion marketplace
+  submission. Repeat published-artifact acceptance for the eventual stable release.
+  Preserve existing release security gates.
 
 See [companion controls and status protocol](PLUGIN.md) and
 [maintenance/recovery behavior](UPDATES.md).

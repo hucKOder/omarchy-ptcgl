@@ -550,3 +550,73 @@ Hosted CI, exact rebuild, protected publication, and downloaded-artifact accepta
 are separate release gates. Fresh login/gameplay, real repair/interruption recovery,
 vertical-bar interaction, and clean-OS first-install acceptance remain open before
 stable promotion or marketplace submission.
+
+## Published v0.5.0-rc.1 verification — 2026-10-29
+
+- Prerelease: <https://github.com/hucKOder/omarchy-ptcgl/releases/tag/v0.5.0-rc.1>.
+  Stable **v0.4.1 remains Latest**; no stable promotion or marketplace submission.
+- Immutable annotated tag source: `fd3136382613d5b8028fbad1c9cfea7fbb1199ae`,
+  merged through [PR #5](https://github.com/hucKOder/omarchy-ptcgl/pull/5) with required
+  checks passing and no branch-protection bypass.
+- [Merged-source CI](https://github.com/hucKOder/omarchy-ptcgl/actions/runs/40902040361),
+  [tag CI](https://github.com/hucKOder/omarchy-ptcgl/actions/runs/40902374313), and the
+  [release workflow](https://github.com/hucKOder/omarchy-ptcgl/actions/runs/40902374298)
+  passed. The release included policy/source-ancestry, vulnerability, shell/unit/race,
+  separate-runner exact-rebuild, and protected-publication gates. The owner's full
+  authenticated no-bypass audit passed again immediately before environment approval.
+- Downloaded all four assets. Installer, manifest, and launcher attestations passed
+  the exact repository/workflow/tag/source/signer/issuer/hosted-runner policy. Manifest
+  identity/platform fields and both artifact hashes matched.
+- Published installer SHA-256:
+  `7281d7db837ef3b137057059790a5bcdaf343afbcc571a5c02a6366b93118868`.
+- Published launcher SHA-256:
+  `bfc75de58ddcc924505d1f9f0057f2cf46e5f49a0121899ef60c58d92a38897e`.
+- A separate clean local worktree at the tagged source rebuilt the exact published
+  launcher bytes. The binary reports `0.5.0-rc.1`, Go 1.27.3, Linux/amd64,
+  `CGO_ENABLED=0`, the tagged source, and `vcs.modified=false`. Embedded licenses and
+  published commit-pinned installation instructions matched the generated source.
+- Workflow actionlint validation passed with actionlint v1.7.7. Hosted annotations
+  about Node.js 20 action deprecation and the Ubuntu runner-image migration remain
+  maintenance follow-ups; neither caused a gate failure.
+
+### Authenticated isolated installation and reinstall
+
+Executed the real commit-pinned bootstrap with explicit RC/source selection and
+`--launcher-only`, in fresh HOME/XDG paths containing spaces. The downloaded bootstrap
+matched reviewed source bytes. The test environment contained no GitHub credentials,
+desktop/session-bus variables, or inherited runtime settings. Package provisioning
+and browser-handler registration used isolated fixtures; HTTPS downloads, release
+authentication, the published installer, and launcher self-installation were real.
+Live compositor, game/runtime, and graphical-dialog commands were blocked by fixtures.
+
+- The installed launcher matched the authenticated published hash and reported the
+  expected version. Both desktop entries passed `desktop-file-validate`, including
+  the new Versions & updates action and confirmed Repair command.
+- Schema-1 status reported `setup-needed` / `idle`; launcher-only mode created no
+  game prefix, installer receipt, or runtime selection.
+- A second real authenticated launcher-only installation preserved byte-for-byte
+  synthetic prefix/settings data, an existing synthetic receipt, the selected
+  runtime profile, integration state, callback fixture, and main/managed Lua files.
+  This is preservation/orchestration coverage, not real Windows Installer acceptance.
+- A separate fresh-HOME `status --json` invocation produced the expected schema-1
+  response without creating that HOME or any application directories.
+- The published binary successfully authenticated the existing official MSI,
+  SHA-256 `53bacfb0ecb71e10390bd8cd3cdc2ae75df67329a355e9d1413efb9680416a12`,
+  with current complete-chain revocation evidence. This was read-only verification;
+  it did not run Windows Installer or change the real cache.
+
+### Scope and remaining acceptance
+
+The real installed launcher retained the exact v0.4.1 hash recorded above. No
+candidate launcher/companion was deployed to the user's desktop, no callback or
+Hyprland configuration was changed there, and no real prefix was modified. Local
+acceptance logs and fixtures are retained outside the repository under
+`/tmp/opencode/ptcgl-v0.5.0-rc.1-acceptance.gwXkjjsx/`.
+
+The prior 0.5.0-dev existing-installation desktop smoke remains the desktop evidence.
+Fresh browser login, a completed match, actual repair and interrupted MSI/runtime
+recovery, vertical-bar interaction, and clean-OS provisioning still need acceptance
+before stable promotion or marketplace submission. A changed-MSI upgrade also needs
+its own record when a newer official installer is available. The published RC's
+authentication and isolated launcher-install acceptance are complete, not a claim
+that these remaining real-desktop/clean-OS checks passed.
