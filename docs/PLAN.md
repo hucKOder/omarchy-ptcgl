@@ -8,6 +8,35 @@ window. Use the official Windows client through UMU, GE-Proton, and XWayland.
 
 ## Current status and next work
 
+### UX milestones 1–3 — implemented in the checkout, 2026-10-29
+
+Prepared for **v0.5.0-rc.1**, not stable promotion. Automated checks use fixtures
+and temporary HOME/XDG paths.
+A matching candidate was subsequently tested on the real desktop and the original
+installation restored; see the [live acceptance record](VALIDATION.md).
+
+- [x] Milestone 1: schema-1 local status API with validated lock ownership, stale
+  marker rejection, startup feedback, repeat-launch waiting, compact expandable
+  companion sections, active-session maintenance gating, and protocol negotiation.
+- [x] Milestone 2: known/unknown-size transfer progress and speed, download-only
+  cancellation, staged managed-runtime recovery, pending MSI detection, and receipt-
+  based readiness. Prefix/settings, verified cache, and prior successful receipts
+  survive failures; partial HTTP resume and MSI rollback are not implemented.
+- [x] Milestone 3: confirmed allowlisted recovery, privacy-safe saved/copied reports,
+  and an explicit component update overview with dated installer comparisons.
+- [x] Existing-installation desktop smoke test: real app-menu startup, repeat
+  launch/focus, download cancellation and MSI verification, cancelled repair,
+  diagnostics/GUI report saving, fullscreen/resize/workspace behavior, both
+  monitors, and game survival through shell restart. Original installation restored.
+- [ ] Remaining desktop acceptance: vertical bar, slow/failing startup variants,
+  fresh browser login and completed match, actual interrupted MSI/runtime recovery,
+  changed-MSI application, and clipboard-copy behavior on the live desktop.
+- [ ] Clean-OS first-time tester and published-artifact acceptance before stable release
+  or companion marketplace submission. Preserve existing release security gates.
+
+See [companion controls and status protocol](PLUGIN.md) and
+[maintenance/recovery behavior](UPDATES.md).
+
 Build steps 1–4 below are implemented. Real-machine setup, browser callback
 delivery, tiled startup, resizing, and repeat-launch focus are recorded in
 [the validation record](VALIDATION.md).
@@ -148,11 +177,11 @@ estimates are relative: **small** is a focused change using existing operations;
 - Verified with isolated installer/Zenity fixtures for result dialogs, failures,
   busy sessions, and repeated desktop integration.
 
-### 2. Real download progress — medium
+### 2. Real download progress — implemented in checkout; desktop acceptance pending
 
 Included in the installation plan's setup-progress work.
 
-- [ ] Show downloaded/total MiB, percentage, and transfer speed for MSI and Proton
+- [x] Show downloaded/total MiB, percentage, and transfer speed for MSI and Proton
   downloads. Use indeterminate progress when the server omits the total size.
 - Show distinct downloading, verifying, extracting, and installing phases.
 - Allow cancellation during downloads, with temporary-file cleanup and a usable
@@ -160,9 +189,9 @@ Included in the installation plan's setup-progress work.
 - Completion: known/unknown-length downloads and cancellation report accurately;
   interrupted transfers preserve the existing verified cache.
 
-### 3. Smoother startup and repeat launch — medium
+### 3. Smoother startup and repeat launch — implemented in checkout; desktop acceptance pending
 
-- [ ] Show brief **Starting Pokémon TCG Live…** feedback until the owned game
+- [x] Show brief **Starting Pokémon TCG Live…** feedback until the owned game
   window appears, then dismiss it without taking focus from the game.
 - A second launch during startup waits briefly for the same session's window and
   focuses it. Report setup/maintenance contention separately from game startup.
@@ -179,9 +208,9 @@ Included in the installation plan's setup-progress work.
 - Verified with isolated chooser/opener fixtures, including cancellation,
   missing folders, custom XDG paths, active sessions, and broken configuration.
 
-### 5. Shareable diagnostics summary — small
+### 5. Shareable diagnostics summary — implemented in checkout; desktop acceptance pending
 
-- [ ] Add launcher/runtime versions and the last applied installer date to the
+- [x] Add launcher/runtime versions and the last applied installer date to the
   diagnostics report, plus a **Save report** action in the graphical view.
 - Completion: one readable report contains version/context details and actionable
   checks; saving or cancelling the save dialog behaves predictably.

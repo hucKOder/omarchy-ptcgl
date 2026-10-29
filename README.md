@@ -14,6 +14,7 @@
 
 <p align="center">
   <a href="#install">Install</a> ·
+  <a href="#omarchy-companion">Companion</a> ·
   <a href="#demo">Watch the demo</a> ·
   <a href="#updates">Updates</a> ·
   <a href="#development">Development</a>
@@ -139,6 +140,43 @@ shortcuts work while the game is running and even when launcher configuration
 needs fixing. A missing folder is explained with its location; the configuration
 folder is optional until you add `config.json`.
 
+## Omarchy companion
+
+**PTCGL Companion** adds a native Omarchy Quattro bar button and themed panel for
+Play/focus, first-time installation, game maintenance, diagnostics, and folders.
+It uses the same launcher and graphical dialogs as the desktop app.
+
+The companion requires the **v0.5.0 release-candidate launcher** (live status
+schema 1); stable v0.4.1 is not compatible. First install the candidate using
+the pinned instructions in [v0.5.0-rc.1's release notes](https://github.com/hucKOder/omarchy-ptcgl/releases/tag/v0.5.0-rc.1),
+adding `--launcher-only` to the final `bash` command. The normal bootstrap and
+companion installer continue to select stable releases, not prereleases.
+
+To validate, copy, and enable the companion from a local checkout on Omarchy:
+
+```bash
+make install-plugin
+```
+
+This needs Qt's `qmllint` and refuses to overwrite an existing plugin.
+Alternatively, install the published companion source through Omarchy with:
+
+```bash
+omarchy plugin add https://github.com/hucKOder/omarchy-ptcgl.git --enable
+```
+
+Click **PTCGL** in the bar. If the launcher is missing, **Install launcher** opens
+a terminal for the existing authenticated release installation. Reopen the panel
+and choose **Set up & play** afterward. Already-installed launchers are detected
+automatically. Removing the companion retains the launcher and game:
+
+```bash
+omarchy plugin remove io.github.huckoder.ptcgl
+```
+
+[Companion controls, dependencies, updates, removal, and development](docs/PLUGIN.md).
+Marketplace publication is pending.
+
 ## Updates
 
 **Game patches happen at launch.** The client runs from its installation
@@ -183,6 +221,45 @@ runtime rollback behavior.
 
 ## Commands
 
+### v0.5.0 release candidate
+
+Milestones 1–3 are included in **v0.5.0-rc.1**, not in the stable v0.4.1
+launcher. They add live activity status, startup feedback, a compact companion,
+measured download progress, recoverable interrupted installations, guided fixes,
+privacy-safe support reports, and a component update overview. Existing-installation
+desktop smoke testing passed; broader gameplay, recovery, and clean-OS acceptance
+are still required before a stable release. Select the candidate explicitly using
+its [pinned release instructions](https://github.com/hucKOder/omarchy-ptcgl/releases/tag/v0.5.0-rc.1),
+or use `make install-launcher` for a local build after closing the game.
+The default release bootstrap continues to select **stable** releases only.
+
+The companion now requires **live status schema 1**. It prompts to upgrade when
+an older launcher lacks that protocol. Its default view shows status and one
+primary action, with **Maintenance**, **Folders**, and **Advanced** collapsed.
+Play becomes **Focus game** while running; maintenance is disabled during game
+sessions and other operations. Status refreshes only while the panel is open and
+never checks the network.
+
+Downloads show MiB, percentage and speed when the total is known, or an
+indeterminate bar otherwise. Download cancellation preserves verified cache files;
+verification and installer phases cannot be cancelled through the dialog. Retries
+restart interrupted transfers rather than resuming partial HTTP downloads.
+
+Use **Maintenance → Diagnostics & recovery** for confirmed, supported fixes and
+**Save report** / **Copy report** (copy requires `wl-copy`). Shared reports omit
+personal paths, raw diagnostic output, configuration, environment variables, and
+login URLs. The local diagnostic view still includes detailed errors. To save a
+report from the terminal:
+
+```sh
+ptcgl-omarchy doctor --save ptcgl-support.txt
+```
+
+Failed checks still produce exit status 1 even when saving succeeds. Use
+**Maintenance → Versions & updates** or `ptcgl-omarchy updates --gui` to inspect
+component versions and explicitly choose an update. An installer comparison is
+labelled with its check date; it is not a claim about in-game patch freshness.
+
 | Command | What it does |
 | --- | --- |
 | `ptcgl-omarchy` | Graphical first-time setup, then play |
@@ -192,6 +269,10 @@ runtime rollback behavior.
 | `repair [--gui]` | Reapply installer-managed game files |
 | `runtime-update [--gui]` | Select this launcher's bundled compatibility profile |
 | `doctor [--json\|--gui]` | Check dependencies, game installation, and desktop integration |
+| `doctor --save <file>` | Save a privacy-safe support report (v0.5.0 RC) |
+| `status [--json]` | Read installation readiness, activity, and safe actions without network access (v0.5.0 RC) |
+| `updates [--gui]` | Explain component versions and explicit update options (v0.5.0 RC) |
+| `fix [--gui] <integration\|setup\|repair\|runtime-update>` | Run an allowlisted recovery action; GUI actions ask for confirmation (v0.5.0 RC) |
 | `open <game\|config\|cache>` | Open the selected folder in your default file manager |
 | `open --gui` | Choose a folder graphically |
 | `integrate` | Refresh the app-menu entry, browser callback, and window rules |
@@ -280,6 +361,10 @@ rejection. `make security` checks module integrity and reachable vulnerabilities
 with that selected build toolchain. `make check-shell` requires ShellCheck.
 See the [security audit and patch status](docs/SECURITY-AUDIT.md).
 
+For the shell companion, `make test-plugin` runs its dependency-free JavaScript
+contract tests (Node.js 18+); `make check-plugin` validates its manifest and QML
+against the installed Omarchy/Qt runtime.
+
 With dependencies already installed, `make install-launcher` installs your local
 build and refreshes desktop integration without running game setup.
 
@@ -301,6 +386,7 @@ manual validation on Omarchy.
 
 - [Implementation plan](docs/PLAN.md)
 - [Installation simplification plan](docs/INSTALLATION-PLAN.md)
+- [Companion plugin plan](docs/PLUGIN-PLAN.md)
 - [Game and runtime update behavior](docs/UPDATES.md)
 - [Real-machine validation record](docs/VALIDATION.md)
 - [Compatibility profile](internal/app/assets/compatibility.json)

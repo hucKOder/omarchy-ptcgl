@@ -1,5 +1,22 @@
 # Game and runtime updates
 
+## v0.5.0 release-candidate maintenance experience
+
+The v0.5.0 release candidate adds `updates [--gui]`, `status [--json]`, confirmed `fix --gui`
+actions, measured download progress, and support report export. These changes are
+not in the stable v0.4.1 launcher. Existing-installation desktop smoke testing
+passed; actual MSI repair/changed-installer application and broader acceptance
+remain pending. See [the live validation record](VALIDATION.md).
+The desktop entry adds **Versions & updates** and routes **Repair game** through
+the confirmed recovery flow. Existing terminal `repair --gui` remains available.
+
+`updates --gui` brings component information together without coupling updates:
+launcher upgrades still use authenticated release installation, installer actions
+only compare/apply the official MSI, and runtime selection is separately confirmed.
+Custom runtime overrides remain user-managed. No component is upgraded automatically.
+Installer comparisons show their check timestamp, never a general “game up to date”
+claim. Normal patches remain the game's responsibility.
+
 ## Normal game patches
 
 `play` launches the game's built-in updater and client from the directory
@@ -60,16 +77,34 @@ an error dialog. Close the game before using these maintenance actions.
   download; partial HTTP resume is deliberately not implemented.
 - GE-Proton archives are checked against a pinned SHA-256 and extracted into a
   staging directory before the completed runtime is published.
+- In the v0.5.0 candidate, an incomplete **managed** runtime is replaced only
+  after a validated replacement is staged. Failed extraction leaves the original
+  untouched. Custom `proton_path` locations are never automatically repaired.
 - The security candidate confines extraction to a fresh filesystem root and
   checks complete relative-symlink chains, including dangling targets and cycles.
 - Installation receipts are advanced only after Windows Installer succeeds
   and the game executable exists.
+- The v0.5.0 candidate writes `installer-pending.json` before MSI application
+  and removes it only after success is recorded. A leftover executable is not
+  sufficient: a valid successful receipt is required for “Ready.” Interrupted or
+  unrecorded installations produce a repair action; retrying `setup` reapplies the
+  installer in the existing prefix instead of declaring completion.
 - A failed MSI invocation can partially change installer-managed files. Run
   `repair` after an interrupted installation. Automatic rollback of Windows
   Installer changes is not provided by the launcher.
 - One advisory session lock serializes setup, game lifetime, update, repair,
   integration, and runtime changes. Login callbacks bypass this lock only for
   an active game session.
+- The v0.5.0 candidate GUI shows downloading/verifying/extracting/installing phases.
+  Download cancellation removes temporary files and preserves verified cache.
+  Cancellation through the dialog cannot terminate verification or Windows
+  Installer. Closing startup feedback or the companion never cancels the game.
+
+For guided recovery, open Diagnostics and choose a supported fix. Each graphical
+fix explains the change and asks for confirmation. `fix` accepts only fixed action
+IDs (`integration`, `setup`, `repair`, `runtime-update`); diagnostic `fix` strings
+are never executed. Diagnostics offers **Save report** and optional **Copy report**;
+the exported report excludes personal paths and raw subprocess/error output.
 
 ## Launcher updates
 

@@ -8,6 +8,18 @@ Relic verification and adds a one-command source bootstrap. Published artifacts
 and isolated launcher-only installation are verified; clean-machine acceptance
 remains pending.
 
+The [2026-10-22 security review](SECURITY-AUDIT.md) adds a prerequisite security
+slice: patched Go certificate trust, complete MSI chain revocation, and
+release-source protections precede new release acceptance. The source bootstrap
+also depends on the separately provisioned `curl`/`gh` trust paths. See the
+[main security priorities](PLAN.md#security-priority--2026-10-22).
+
+The bulk source patch now requires Go 1.27.3, validates complete certificate
+revocation paths and archive links, filters runtime credentials, and adds release
+policy/rebuild gates. Read-only candidate checks passed against the official MSI
+and both public compromised-CA test chains. GitHub protection activation and
+closed-game installation/gameplay acceptance remain prerequisites to publication.
+
 ## Target experience
 
 Choose a supported release, run the documented installation, open the app, and
@@ -26,6 +38,8 @@ the release-specific manual block. See [the trust model](RELEASES.md).
 
 | Priority | Work | Dependency |
 | --- | --- | --- |
+| P0 | Patch Go trust handling and complete publisher/timestamp chain revocation | SEC-01/SEC-02 in the security audit; required before a new launcher release |
+| P1, before release | Protect release source/tags and independently validate published bytes | SEC-04; preserve the existing attestation and source-selection policy |
 | P0 | Remove external verifier distribution | Released in v0.4.0 with pinned Relic; published-artifact verification passed |
 | P1 | Publish one complete, release-specific installation procedure | Can start immediately alongside P0 |
 | P1 | Improve prerequisite checks and failure messages | Use the selected provisioning route once P0 is resolved |
@@ -123,22 +137,27 @@ launcher and never fall back to building `main`.
 
 ## 4. Make progress and recovery predictable
 
-- [ ] Show downloading, verifying, extracting, and installing as distinct phases.
+Included in the v0.5.0 release candidate as UX milestone 2, with isolated regressions
+and existing-installation desktop smoke testing. Not in stable v0.4.1; real
+MSI/runtime recovery and clean-OS acceptance remain pending before stable promotion.
+See [the milestone status](PLAN.md).
+
+- [x] Show downloading, verifying, extracting, and installing as distinct phases.
   Show downloaded MiB and percentage when the server provides a total; use
   indeterminate progress otherwise. Reuse the existing download-progress QoL item.
-- [ ] Allow download cancellation with temporary-file cleanup and a clear retry
+- [x] Allow download cancellation with temporary-file cleanup and a clear retry
   action. Make cancellation availability follow the current phase.
-- [ ] Give one recovery action for each failed stage:
+- [x] Give one recovery action for each failed stage:
   - Before the launcher is installed: repeat the verified release procedure.
   - Interrupted download or runtime setup: resume with `ptcgl-omarchy setup`.
   - Failed or interrupted MSI application: use `ptcgl-omarchy repair`.
-- [ ] Make those recovery actions reliable. Re-stage an incomplete managed
+- [x] Make those recovery actions reliable. Re-stage an incomplete managed
   runtime instead of requiring the user to move directories manually. Keep
   custom runtime overrides user-managed.
-- [ ] Use successful installation state as well as executable presence to detect
+- [x] Use successful installation state as well as executable presence to detect
   incomplete MSI setup. An executable left by a failed install must not cause
   first launch to incorrectly declare installation complete.
-- [ ] Align CLI errors, graphical reports, diagnostics, and documentation with
+- [x] Align CLI errors, graphical reports, diagnostics, and documentation with
   the same recovery guidance.
 
 Likely files: `internal/app/download.go`, `internal/app/proton.go`,
@@ -204,7 +223,10 @@ replace the current release-authentication policy with package signatures.
 
 ## Next implementation slice
 
-Validate the v0.4.0 built-in verifier and one-command bootstrap on clean Omarchy,
-then implement setup progress and recovery. The existing v0.3.0
-release-specific installation and launcher-only upgrade remain verified. Legacy
-verifier packaging is no longer on the new installation's critical path.
+Complete the security prerequisites above, then validate the patched verifier and
+one-command bootstrap on clean Omarchy before implementing setup progress and
+recovery. Use isolated fixtures during the user's active game session; perform
+installed-launcher/runtime/browser acceptance after the game closes. The
+existing v0.3.0 release-specific installation and launcher-only upgrade remain
+verified historical records. Legacy verifier packaging is no longer on the new
+installation's critical path.

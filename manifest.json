@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.huckoder.ptcgl",
+  "name": "PTCGL Companion",
+  "version": "0.1.0",
+  "author": "hucKOder",
+  "license": "MIT",
+  "description": "Install, launch, and maintain Pokémon TCG Live from the Omarchy bar.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "plugin/BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "PTCGL Companion",
+    "category": "Games",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

@@ -13,6 +13,7 @@ type Check struct {
 	OK     bool   `json:"ok"`
 	Detail string `json:"detail"`
 	Fix    string `json:"fix,omitempty"`
+	Action string `json:"action,omitempty"`
 }
 
 func (a *App) Doctor(ctx context.Context) []Check {
@@ -21,7 +22,23 @@ func (a *App) Doctor(ctx context.Context) []Check {
 		if ok {
 			fix = ""
 		}
-		checks = append(checks, Check{Name: name, OK: ok, Detail: detail, Fix: fix})
+		check := Check{Name: name, OK: ok, Detail: detail, Fix: fix}
+		if !ok {
+			switch name {
+			case "app-menu entry", "callback entry", "browser callback", "Hyprland rules":
+				check.Action = "integration"
+			case "prefix", "Visual C++ runtime", "game":
+				check.Action = "setup"
+			case "Proton":
+				if a.Config.ProtonPath == "" {
+					check.Action = "setup"
+				}
+			}
+			if name == "game" && (a.installPending() || exists(a.gamePath())) {
+				check.Action = "repair"
+			}
+		}
+		checks = append(checks, check)
 	}
 	for _, dependency := range []struct{ name, fix string }{
 		{"omarchy", "Run from your Omarchy desktop session with Omarchy's bin directory in PATH."},
@@ -50,8 +67,6 @@ func (a *App) Doctor(ctx context.Context) []Check {
 		protonDetail += ": " + protonErr.Error()
 		if a.Config.ProtonPath != "" {
 			protonFix = fmt.Sprintf("Correct proton_path in %q or repair the custom runtime at %q.", filepath.Join(a.Paths.Config, "config.json"), proton)
-		} else if _, err := os.Stat(proton); !os.IsNotExist(err) {
-			protonFix = fmt.Sprintf("Move the incomplete runtime at %q aside, then run: ptcgl-omarchy setup", proton)
 		}
 	}
 	add("Proton", protonErr == nil, protonDetail, protonFix)
@@ -82,6 +97,12 @@ func (a *App) Doctor(ctx context.Context) []Check {
 			detail = err.Error()
 		} else if !ok {
 			detail += ": not a regular file"
+		}
+		if item.name == "game" && a.installPending() {
+			ok, detail, item.fix = false, "Windows Installer did not complete successfully; existing files may be partial.", "ptcgl-omarchy repair"
+		}
+		if item.name == "game" && ok && !a.gameReady() {
+			ok, detail, item.fix = false, "Game files exist without a valid successful installation receipt; repair to verify installation.", "ptcgl-omarchy repair"
 		}
 		add(item.name, ok, detail, item.fix)
 	}

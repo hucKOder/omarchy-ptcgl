@@ -60,10 +60,9 @@ func (a *App) ensureProton(ctx context.Context) error {
 		return validateProton(root)
 	}
 	if _, err := os.Stat(root); err == nil {
-		if err := validateProton(root); err != nil {
-			return err
+		if validateProton(root) == nil {
+			return writeJSON(filepath.Join(a.Paths.State, "runtime.json"), a.Profile)
 		}
-		return writeJSON(filepath.Join(a.Paths.State, "runtime.json"), a.Profile)
 	} else if !os.IsNotExist(err) {
 		return err
 	}
@@ -79,8 +78,8 @@ func (a *App) ensureProton(ctx context.Context) error {
 		return nil
 	}
 	if verify(archive) != nil {
-		a.progress("Downloading " + a.Profile.ProtonRelease + "…")
-		if err := a.Download.Download(ctx, a.Profile.ProtonURL, archive, 2<<30, verify); err != nil {
+		a.phase("downloading", "Downloading "+safeLabel(a.Profile.ProtonRelease)+"…")
+		if err := a.download(ctx, a.Profile.ProtonURL, archive, 2<<30, verify); err != nil {
 			return err
 		}
 	}
@@ -92,8 +91,13 @@ func (a *App) ensureProton(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(staging)
-	a.progress("Extracting GE-Proton…")
+	keepStaging := false
+	defer func() {
+		if !keepStaging {
+			_ = os.RemoveAll(staging)
+		}
+	}()
+	a.phase("extracting", "Extracting GE-Proton…")
 	if err := extractProton(ctx, archive, staging, a.Profile.ProtonDirectory); err != nil {
 		return err
 	}
@@ -101,7 +105,26 @@ func (a *App) ensureProton(ctx context.Context) error {
 	if err := validateProton(staged); err != nil {
 		return err
 	}
+	// Only replace the selected, invalid managed directory after a complete
+	// replacement is ready. Preserve the original on publication failure.
+	backup := filepath.Join(staging, "incomplete-runtime")
+	replaced := false
+	if _, err := os.Lstat(root); err == nil {
+		if err := os.Rename(root, backup); err != nil {
+			return err
+		}
+		replaced = true
+	} else if !os.IsNotExist(err) {
+		return err
+	}
 	if err := os.Rename(staged, root); err != nil {
+		if replaced {
+			if restoreErr := os.Rename(backup, root); restoreErr != nil {
+				// Do not remove the only remaining copy if restoration fails.
+				keepStaging = true
+				return fmt.Errorf("publish runtime: %w; previous incomplete runtime is at %s", err, backup)
+			}
+		}
 		return err
 	}
 	return writeJSON(filepath.Join(a.Paths.State, "runtime.json"), a.Profile)
@@ -110,7 +133,7 @@ func (a *App) ensureProton(ctx context.Context) error {
 // A launcher upgrade does not silently replace the selected compatibility stack.
 // New releases retain the saved profile until this command is explicitly used.
 func (a *App) UpdateRuntime(ctx context.Context) error {
-	return a.withLock(func() error {
+	return a.withOperation("runtime-update", func() error {
 		if a.Config.ProtonPath != "" {
 			return fmt.Errorf("a custom proton_path is configured; manage that runtime directly")
 		}

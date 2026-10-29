@@ -15,15 +15,26 @@ import (
 )
 
 func (a *App) Play(ctx context.Context, args []string) error {
-	if a.focusExisting(ctx) {
+	return a.play(ctx, args, false)
+}
+
+func (a *App) play(ctx context.Context, args []string, feedback bool) error {
+	window, err := a.existingWindow(ctx)
+	if err != nil {
+		return fmt.Errorf("cannot inspect game windows; open diagnostics before launching")
+	}
+	if window != nil {
+		if err := a.focusWindow(ctx, *window); err != nil {
+			return fmt.Errorf("the game is already running, but its window could not be focused; no second game was started")
+		}
 		a.progress("Focused the running game.")
 		return nil
 	}
-	return a.withLock(func() error {
+	err = a.withOperation("play", func() error {
 		if err := a.setup(ctx); err != nil {
 			return err
 		}
-		a.progress("Launching Pokémon TCG Live…")
+		a.phase("starting", "Starting Pokémon TCG Live…")
 		launchArgs := []string{a.gamePath(), "-screen-fullscreen", "0", "-nolog"}
 		launchArgs = append(launchArgs, a.Config.ExtraArgs...)
 		launchArgs = append(launchArgs, args...)
@@ -35,11 +46,47 @@ func (a *App) Play(ctx context.Context, args []string) error {
 			return err
 		}
 		defer os.Remove(marker)
+		if feedback {
+			stop := a.startupFeedback(ctx)
+			defer stop()
+		}
 		if err := a.Runner.Run(ctx, c); err != nil {
 			return fmt.Errorf("game exited: %w", err)
 		}
 		return nil
 	})
+	if errors.Is(err, ErrBusy) {
+		if a.focusExisting(ctx) {
+			return nil
+		}
+		if op, ok := readOperation(a.Paths); ok {
+			if op.Kind == "play" && (op.Progress.Phase == "starting" || (a.gameReady() && a.prefixReady() && a.vcReady() && validateProton(a.protonPath()) == nil)) {
+				return a.waitForExisting(ctx, 8*time.Second)
+			}
+			return fmt.Errorf("setup or maintenance is in progress; wait for it to finish: %w", err)
+		}
+	}
+	return err
+}
+
+func (a *App) waitForExisting(ctx context.Context, limit time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, limit)
+	defer cancel()
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if a.focusExisting(ctx) {
+			return nil
+		}
+		if op, ok := readOperation(a.Paths); !ok || op.Kind != "play" {
+			return fmt.Errorf("the previous startup ended; try Play again")
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("the game is still starting; wait briefly, then choose Focus game or open diagnostics")
+		case <-ticker.C:
+		}
+	}
 }
 
 var ErrCallback = errors.New("invalid Pokémon authentication callback")
@@ -145,24 +192,38 @@ func samePrefix(path, prefix string) bool {
 }
 
 func (a *App) focusExisting(ctx context.Context) bool {
-	if os.Getenv("HYPRLAND_INSTANCE_SIGNATURE") == "" {
+	w, err := a.existingWindow(ctx)
+	if err != nil || w == nil {
 		return false
+	}
+	return a.focusWindow(ctx, *w) == nil
+}
+
+func (a *App) focusWindow(ctx context.Context, w Window) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	dispatch := "hl.dsp.focus({ window = " + luaQuote("address:"+w.Address) + " })"
+	return a.Runner.Run(ctx, Command{Name: "hyprctl", Args: []string{"dispatch", dispatch}, Quiet: true})
+}
+
+func (a *App) existingWindow(ctx context.Context) (*Window, error) {
+	if os.Getenv("HYPRLAND_INSTANCE_SIGNATURE") == "" {
+		return nil, nil
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	b, err := a.Runner.Output(ctx, Command{Name: "hyprctl", Args: []string{"clients", "-j"}})
 	if err != nil {
-		return false
+		return nil, err
 	}
 	var windows []Window
 	if json.Unmarshal(b, &windows) != nil {
-		return false
+		return nil, fmt.Errorf("window status unavailable")
 	}
 	for _, w := range windows {
 		if a.ownWindow(w) {
-			dispatch := "hl.dsp.focus({ window = " + luaQuote("address:"+w.Address) + " })"
-			return a.Runner.Run(ctx, Command{Name: "hyprctl", Args: []string{"dispatch", dispatch}, Quiet: true}) == nil
+			return &w, nil
 		}
 	}
-	return false
+	return nil, nil
 }

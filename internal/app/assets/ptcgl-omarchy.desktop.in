@@ -7,7 +7,11 @@ Icon=ptcgl-omarchy
 Terminal=false
 Categories=Game;CardGame;
 StartupNotify=false
-Actions=CheckUpdate;Update;Repair;Folders;Doctor;
+Actions=Updates;CheckUpdate;Update;Repair;Folders;Doctor;
+
+[Desktop Action Updates]
+Name=Versions & updates
+Exec=@EXEC@ updates --gui
 
 [Desktop Action CheckUpdate]
 Name=Check installer updates
@@ -19,7 +23,7 @@ Exec=@EXEC@ update --gui
 
 [Desktop Action Repair]
 Name=Repair game
-Exec=@EXEC@ repair --gui
+Exec=@EXEC@ fix --gui repair
 
 [Desktop Action Folders]
 Name=Open folders
