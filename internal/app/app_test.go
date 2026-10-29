@@ -43,6 +43,8 @@ func (r *fakeRunner) Start(c Command) error { return r.Run(context.Background(),
 
 func testApp(t *testing.T) (*App, *fakeRunner) {
 	t.Helper()
+	// Every test opts into a fixture desktop explicitly, never the real session.
+	t.Setenv("HYPRLAND_INSTANCE_SIGNATURE", "")
 	home := filepath.Join(t.TempDir(), "home with spaces and é")
 	p := Paths{Home: home, Data: filepath.Join(home, "data", Name), Cache: filepath.Join(home, "cache", Name),
 		Config: filepath.Join(home, "config", Name), State: filepath.Join(home, "state", Name),
@@ -76,6 +78,9 @@ func writeTestFile(t *testing.T, path string, content []byte) {
 
 func readyRuntime(t *testing.T, a *App) {
 	t.Helper()
+	if err := writeJSON(filepath.Join(a.Paths.State, "installation.json"), Installation{InstallerSHA256: strings.Repeat("0", 64), AppliedAt: time.Now().UTC(), Operation: "setup"}); err != nil {
+		t.Fatal(err)
+	}
 	for _, name := range []string{"proton", "toolmanifest.vdf", "compatibilitytool.vdf", "version"} {
 		writeTestFile(t, filepath.Join(a.protonPath(), name), []byte("runtime"))
 	}
@@ -385,9 +390,10 @@ func TestIntegrationIsRepeatableAndRestoresPreviousHandler(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, action := range []string{
-			"Actions=CheckUpdate;Update;Repair;Folders;Doctor;",
+			"Actions=Updates;CheckUpdate;Update;Repair;Folders;Doctor;",
+			"[Desktop Action Updates]\nName=Versions & updates\nExec=" + desktopQuote(a.Paths.Bin) + " updates --gui",
 			"[Desktop Action CheckUpdate]\nName=Check installer updates\nExec=" + desktopQuote(a.Paths.Bin) + " update --check --gui",
-			"[Desktop Action Repair]\nName=Repair game\nExec=" + desktopQuote(a.Paths.Bin) + " repair --gui",
+			"[Desktop Action Repair]\nName=Repair game\nExec=" + desktopQuote(a.Paths.Bin) + " fix --gui repair",
 			"[Desktop Action Folders]\nName=Open folders\nExec=" + desktopQuote(a.Paths.Bin) + " open --gui",
 		} {
 			if strings.Count(string(entry), action) != 1 {

@@ -1,7 +1,7 @@
 GO ?= go
-VERSION ?= 0.4.1
+VERSION ?= 0.5.0-rc.1
 
-.PHONY: build test check check-shell security licenses install install-launcher uninstall clean
+.PHONY: build test check check-shell security test-plugin check-plugin install-plugin licenses install install-launcher uninstall clean
 build:
 	mkdir -p build
 	CGO_ENABLED=0 $(GO) build -mod=readonly -trimpath -ldflags '-s -w -X ptcgl-omarchy/internal/app.Version=$(VERSION)' -o build/ptcgl-omarchy ./cmd/ptcgl-omarchy
@@ -10,7 +10,7 @@ test:
 	$(GO) test -race ./...
 
 check:
-	bash -n bootstrap.sh install.sh scripts/release-assets.sh scripts/check-release-policy.sh
+	bash -n bootstrap.sh install.sh scripts/release-assets.sh scripts/plugin-install.sh scripts/plugin-local.sh scripts/check-plugin.sh scripts/check-release-policy.sh
 	$(GO) run scripts/license-notices.go --check
 	$(GO) vet ./...
 	$(GO) test ./...
@@ -22,6 +22,15 @@ check-shell:
 security:
 	$(GO) mod verify
 	$(GO) run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+test-plugin:
+	node --test scripts/tests/plugin-model.test.cjs
+
+check-plugin:
+	bash scripts/check-plugin.sh
+
+install-plugin: check-plugin
+	bash scripts/plugin-local.sh
 
 licenses:
 	$(GO) run scripts/license-notices.go

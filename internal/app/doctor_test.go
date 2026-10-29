@@ -84,7 +84,7 @@ func TestDoctorExplainsFailures(t *testing.T) {
 					t.Fatal(err)
 				}
 			},
-			check: "Proton", detail: "missing version", fix: "Move the incomplete runtime",
+			check: "Proton", detail: "missing version", fix: "ptcgl-omarchy setup",
 		},
 		{
 			name: "missing custom runtime",

@@ -3,12 +3,29 @@ Source commit: `@SOURCE_COMMIT@`
 
 ## Highlights
 
-- One-command installation with automatic repository dependencies and built-in
-  MSI signature, publisher, and certificate verification; no AUR packages.
-- Complete release-pinned installation instructions remain available below.
-- Signature checks retain publisher, certificate-chain, timestamp, and online
-  revocation verification without an external verifier.
-- Pinned Go dependencies, automated vulnerability checks, and bundled license notices.
+- Live local status, startup feedback, and repeat-launch focus for the same game.
+- Compact Omarchy companion with activity-aware controls and status schema 1.
+- Measured download progress, download-only cancellation, and recoverable
+  interrupted managed-runtime/MSI setup without resetting the existing prefix.
+- Confirmed recovery actions, privacy-safe support reports, and separate
+  launcher/runtime/official-installer update information.
+- Updated Go crypto dependencies; existing MSI authentication, patched Go trust,
+  release protections, attestations, and independent rebuild gates are retained.
+
+## Release-candidate scope
+
+The v0.5.0 candidate is for opt-in testing, not stable promotion. Existing-installation
+desktop smoke testing passed, including startup/focus, measured downloads,
+diagnostics/report saving, and game survival through a shell restart. Fresh browser
+login, a completed match, real repair/interrupted-install recovery, vertical-bar
+layout, and clean-OS provisioning still need acceptance. See the
+[validation record](https://github.com/hucKOder/omarchy-ptcgl/blob/@SOURCE_COMMIT@/docs/VALIDATION.md).
+
+Stable **v0.4.1 remains Latest**. The default bootstrap and companion's install/upgrade
+button select stable releases, not this candidate. Install the candidate explicitly
+using the pinned instructions below before enabling its companion. Do not use the
+stable-install button to upgrade or reinstall the candidate. Companion marketplace
+submission and stable promotion are separate follow-ups.
 
 ## Install
 

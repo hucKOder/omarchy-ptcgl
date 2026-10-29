@@ -23,6 +23,10 @@ Usage: ptcgl-omarchy <command> [options]
   install            Install this binary and Omarchy integration for your user
   integrate          Register app menu, login callback, and tiled window rules
   doctor [--json]     Check runtime, installation, and desktop integration
+  doctor --save FILE  Save a privacy-safe support report
+  status [--json]     Read installation readiness and current activity
+  updates [--gui]     Explain component versions and explicit update actions
+  fix [--gui] <id>    Confirm/run a supported recovery action
   open <folder>       Open game, config, or cache in your file manager
   open --gui          Choose a folder graphically
   uninstall          Remove binary and integration; retain installed game data
@@ -68,6 +72,7 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 	gui := fs.Bool("gui", false, "show graphical dialogs")
 	checkOnly := fs.Bool("check", false, "compare the latest official installer without applying it")
 	jsonOutput := fs.Bool("json", false, "print structured diagnostics")
+	saveReport := fs.String("save", "", "save a privacy-safe support report (doctor only)")
 	// Never send callback URLs through flag parsing or its error output.
 	if command != "callback" {
 		if err := fs.Parse(args); err != nil {
@@ -77,7 +82,7 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 			return 2
 		}
 	}
-	if command != "play" && command != "open" && len(fs.Args()) > 0 {
+	if command != "play" && command != "open" && command != "fix" && len(fs.Args()) > 0 {
 		fmt.Fprintln(errOut, "unexpected positional arguments")
 		return 2
 	}
@@ -85,8 +90,12 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "--check is only valid with update")
 		return 2
 	}
-	if *jsonOutput && command != "doctor" {
-		fmt.Fprintln(errOut, "--json is only valid with doctor")
+	if *jsonOutput && command != "doctor" && command != "status" {
+		fmt.Fprintln(errOut, "--json is only valid with doctor or status")
+		return 2
+	}
+	if *saveReport != "" && (command != "doctor" || *jsonOutput || *gui) {
+		fmt.Fprintln(errOut, "--save is only valid with terminal doctor, without --json")
 		return 2
 	}
 	reportError := func(err error) int {
@@ -102,6 +111,9 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 	}
 	p, err := UserPaths()
 	if err != nil {
+		if command == "status" {
+			return outputStatus(out, unavailableStatus(), *jsonOutput)
+		}
 		return reportError(err)
 	}
 	var a *App
@@ -111,6 +123,9 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 	} else {
 		a, err = New(p, out, errOut)
 		if err != nil {
+			if command == "status" {
+				return outputStatus(out, unavailableStatus(), *jsonOutput)
+			}
 			return reportError(err)
 		}
 	}
@@ -126,7 +141,7 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 	case "setup":
 		err = operation(a.Setup)
 	case "play":
-		err = a.Play(ctx, fs.Args())
+		err = a.play(ctx, fs.Args(), *gui)
 	case "app":
 		err = a.Desktop(ctx)
 	case "update", "repair":
@@ -157,7 +172,13 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 	case "doctor":
 		checks := a.Doctor(ctx)
 		if *gui {
-			err = ShowReport(ctx, FormatChecks(checks))
+			err = a.DiagnosticsGUI(ctx)
+			checks = a.Doctor(ctx)
+		} else if *saveReport != "" {
+			err = AtomicWrite(*saveReport, []byte(a.SupportReport(checks)), 0600)
+			if err == nil {
+				fmt.Fprintln(out, "Saved privacy-safe support report.")
+			}
 		} else if *jsonOutput {
 			encoder := json.NewEncoder(out)
 			encoder.SetIndent("", "  ")
@@ -173,6 +194,20 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 			}
 			return 0
 		}
+	case "status":
+		return outputStatus(out, a.Status(ctx), *jsonOutput)
+	case "updates":
+		if *gui {
+			err = a.UpdatesGUI(ctx)
+		} else {
+			fmt.Fprintln(out, a.UpdatesSummary())
+		}
+	case "fix":
+		if len(fs.Args()) != 1 {
+			fmt.Fprintln(errOut, "usage: ptcgl-omarchy fix [--gui] <integration|setup|repair|runtime-update>")
+			return 2
+		}
+		err = a.Fix(ctx, fs.Arg(0), *gui)
 	default:
 		fmt.Fprintf(errOut, "unknown command %q\n%s", command, help)
 		return 2
@@ -180,5 +215,17 @@ func RunCLI(ctx context.Context, args []string, out, errOut io.Writer) int {
 	if err != nil {
 		return reportError(err)
 	}
+	return 0
+}
+
+func outputStatus(out io.Writer, status Status, jsonOutput bool) int {
+	if jsonOutput {
+		if err := json.NewEncoder(out).Encode(status); err != nil {
+			return 1
+		}
+	} else {
+		fmt.Fprintf(out, "Installation: %s\nActivity: %s\n%s\n", status.Readiness, status.Activity, status.Message)
+	}
+	// An unavailable component is data, not a malformed protocol response.
 	return 0
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -20,38 +22,128 @@ func (a *App) withProgress(ctx context.Context, title, text string, operation fu
 	if err := a.require("zenity"); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "zenity", "--progress", "--pulsate", "--auto-close", "--no-cancel", "--title="+title, "--text="+text, "--width=480")
-	pipe, err := cmd.StdinPipe()
-	if err != nil {
-		return err
+	events := make(chan ProgressEvent, 8)
+	previous := a.Progress
+	a.Progress = func(event ProgressEvent) {
+		select {
+		case events <- event:
+		case <-ctx.Done():
+		}
 	}
-	if err := cmd.Start(); err != nil {
+	defer func() { a.Progress = previous }()
+	dialog, err := newProgressDialog(ctx, title, text, false, false)
+	if err != nil {
 		return err
 	}
 	finished := make(chan error, 1)
-	go func() {
-		err := cmd.Wait()
-		finished <- err
-		if err != nil {
-			cancel()
+	go func() { finished <- operation(ctx) }()
+	var dialogErr error
+	for {
+		var closed <-chan error
+		if dialog != nil {
+			closed = dialog.done
 		}
-	}()
-	previous := a.Notify
-	a.Notify = func(message string) { _, _ = fmt.Fprintln(pipe, "# "+strings.ReplaceAll(message, "\n", " ")) }
-	err = operation(ctx)
-	a.Notify = previous
-	_, _ = fmt.Fprintln(pipe, "100")
-	_ = pipe.Close()
-	dialogErr := <-finished
+		select {
+		case event := <-events:
+			if dialogErr != nil {
+				if event.Cancellable {
+					a.cancelCurrentDownload()
+				}
+				continue
+			}
+			known := event.Phase == "downloading" && event.Total > 0
+			if dialog != nil && (dialog.known != known || dialog.cancellable != event.Cancellable) {
+				dialogErr = dialog.finish()
+				dialog = nil
+			}
+			if dialogErr != nil {
+				a.cancelCurrentDownload()
+				continue
+			}
+			if dialog == nil {
+				dialog, dialogErr = newProgressDialog(ctx, title, progressText(event), known, event.Cancellable)
+				if dialogErr != nil {
+					a.cancelCurrentDownload()
+					continue
+				}
+			}
+			_, _ = fmt.Fprintln(dialog.pipe, "# "+html.EscapeString(strings.ReplaceAll(progressText(event), "\n", " ")))
+			if known {
+				percent := min(99, int(float64(event.Downloaded)/float64(event.Total)*100))
+				_, _ = fmt.Fprintln(dialog.pipe, max(0, percent))
+			}
+		case err := <-closed:
+			_ = dialog.pipe.Close()
+			dialog.cancel()
+			dialog = nil
+			if err == nil {
+				err = fmt.Errorf("progress window dismissed")
+			}
+			dialogErr = err
+			// Only an active network transfer can be cancelled. Never propagate a
+			// dialog close into Windows Installer or the running game.
+			a.cancelCurrentDownload()
+		case err := <-finished:
+			if dialog != nil {
+				if closeErr := dialog.finish(); dialogErr == nil {
+					dialogErr = closeErr
+				}
+			}
+			if err != nil {
+				return err
+			}
+			if dialogErr != nil {
+				return fmt.Errorf("progress dialog closed; operation has finished, check diagnostics before retrying: %w", dialogErr)
+			}
+			return ctx.Err()
+		}
+	}
+}
+
+type progressDialog struct {
+	pipe               io.WriteCloser
+	done               chan error
+	cancel             context.CancelFunc
+	known, cancellable bool
+}
+
+func newProgressDialog(ctx context.Context, title, text string, known, cancellable bool) (*progressDialog, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	args := []string{"--progress", "--auto-close", "--title=" + title, "--text=" + html.EscapeString(text), "--width=480"}
+	if !known {
+		args = append(args, "--pulsate")
+	}
+	if !cancellable {
+		args = append(args, "--no-cancel")
+	}
+	cmd := exec.CommandContext(ctx, "zenity", args...)
+	cmd.WaitDelay = 2 * time.Second
+	pipe, err := cmd.StdinPipe()
 	if err != nil {
+		cancel()
+		return nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		_ = pipe.Close()
+		cancel()
+		return nil, err
+	}
+	d := &progressDialog{pipe: pipe, done: make(chan error, 1), cancel: cancel, known: known, cancellable: cancellable}
+	go func() { d.done <- cmd.Wait() }()
+	return d, nil
+}
+
+func (d *progressDialog) finish() error {
+	_, _ = io.WriteString(d.pipe, "100\n")
+	_ = d.pipe.Close()
+	defer d.cancel()
+	select {
+	case err := <-d.done:
 		return err
+	case <-time.After(2 * time.Second):
+		d.cancel()
+		return <-d.done
 	}
-	if dialogErr != nil {
-		return fmt.Errorf("progress dialog closed: %w", dialogErr)
-	}
-	return ctx.Err()
 }
 
 func (a *App) UpdateGUI(ctx context.Context, repair, checkOnly bool) error {
@@ -93,18 +185,21 @@ func (a *App) UpdateGUI(ctx context.Context, repair, checkOnly bool) error {
 }
 
 func (a *App) Desktop(ctx context.Context) error {
-	if !exists(a.gamePath()) || !a.prefixReady() || !a.vcReady() || validateProton(a.protonPath()) != nil {
+	if a.focusExisting(ctx) {
+		return nil
+	}
+	if !a.gameReady() || !a.prefixReady() || !a.vcReady() || validateProton(a.protonPath()) != nil {
 		if err := a.WithProgress(ctx, a.Setup); err != nil {
 			return err
 		}
 	}
-	return a.Play(ctx, nil)
+	return a.play(ctx, nil, true)
 }
 
 func ShowError(message string) {
 	ctx, cancel := context.WithTimeout(context.Background(), dialogTimeout)
 	defer cancel()
-	_ = exec.CommandContext(ctx, "zenity", "--error", "--title=Pokémon TCG Live", "--text="+message, "--width=500").Run()
+	_ = exec.CommandContext(ctx, "zenity", "--error", "--no-markup", "--title=Pokémon TCG Live", "--text="+message, "--width=500").Run()
 }
 
 func ShowReport(ctx context.Context, report string) error {

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Keep dialog tests off the real desktop.
@@ -25,6 +26,11 @@ printf 'BEGIN %s\n' "$1" >&3
 printf '%s\n' "$@" >&3
 case "$1" in
   --progress)
+    no_cancel=0
+    for arg in "$@"; do
+      [ "$arg" = --no-cancel ] && no_cancel=1
+    done
+    if [ "${TEST_CANCEL_DOWNLOAD:-0}" = 1 ] && [ "$no_cancel" = 0 ]; then exit 1; fi
     while IFS= read -r line; do
       printf 'progress: %s\n' "$line" >&3
     done
@@ -38,6 +44,19 @@ case "$1" in
     exit "$TEST_FOLDER_EXIT"
     ;;
   --error) exit 0 ;;
+  --question) exit "${TEST_QUESTION_EXIT:-0}" ;;
+  --file-selection)
+    printf '%s\n' "$TEST_REPORT_FILE"
+    exit "${TEST_FILE_EXIT:-0}"
+    ;;
+  --text-info)
+    while IFS= read -r line; do printf 'report: %s\n' "$line" >&3; done
+    if [ -n "$TEST_TEXT_ACTION" ] && [ ! -e "$TEST_DIALOG_LOG.action" ]; then
+      : > "$TEST_DIALOG_LOG.action"
+      printf '%s\n' "$TEST_TEXT_ACTION"
+    fi
+    exit 0
+    ;;
   *) exit 2 ;;
 esac
 `
@@ -51,6 +70,11 @@ esac
 	t.Setenv("TEST_FOLDER_STDERR", "")
 	t.Setenv("TEST_FOLDER_SELECTION", "")
 	t.Setenv("TEST_FOLDER_EXIT", "0")
+	t.Setenv("TEST_QUESTION_EXIT", "0")
+	t.Setenv("TEST_REPORT_FILE", "")
+	t.Setenv("TEST_TEXT_ACTION", "")
+	t.Setenv("TEST_FILE_EXIT", "0")
+	t.Setenv("TEST_CANCEL_DOWNLOAD", "0")
 	return log
 }
 
@@ -137,7 +161,7 @@ func TestGraphicalMaintenanceResults(t *testing.T) {
 				hash = "previous installer"
 			}
 			receipt := filepath.Join(a.Paths.State, "installation.json")
-			if err := writeJSON(receipt, Installation{InstallerSHA256: hash}); err != nil {
+			if err := writeJSON(receipt, Installation{InstallerSHA256: hash, AppliedAt: time.Now().UTC(), Operation: "setup"}); err != nil {
 				t.Fatal(err)
 			}
 			before, _ := os.ReadFile(receipt)

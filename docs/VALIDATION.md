@@ -408,3 +408,145 @@ recorded above, including the initial 61/61 stall and subsequent clean retry.
 Clean-OS dependency provisioning, a future changed-MSI upgrade, custom overlays,
 and filesystem/network sandboxing remain separate follow-ups. The installed
 security release and its authenticated upgrade acceptance are complete.
+
+## UX milestones 1–3 — isolated implementation checks, 2026-10-29
+
+Implemented the live status/startup/compact companion milestone, download progress
+and interrupted-install recovery, and guided diagnostics/component update overview
+in the working checkout. This is **not** acceptance of a published release or an
+installed desktop upgrade.
+
+- `make check`, `make test` (race-enabled), and `make build` passed with Go 1.27.3.
+- `make test-plugin` passed all 11 JavaScript contract tests; `make check-plugin`
+  passed Omarchy manifest validation and zero-warning QML lint with Qt 6.12.0.
+- `make check-shell` and module integrity verification passed.
+- `make security` found no reachable vulnerabilities (one module-only advisory
+  remains reported by the scanner, outside imported vulnerable packages/symbols).
+- An isolated built-binary `status --json` smoke check emitted a schema-1
+  `setup-needed` / `idle` response and created no HOME/data/state directories.
+- New launcher regressions cover actual flock ownership and process-start/boot
+  identity, stale/unknown operation metadata, orphaned owned windows, repeat launch
+  during startup, known/unknown-length downloads, cache-preserving cancellation,
+  non-cancellable verifier/MSI phases, runtime re-staging and custom-runtime
+  preservation, interrupted/unrecorded MSI installation with leftover executables,
+  confirmed/cancelled fixes, private report saving/copying, and update-component
+  separation. Startup dialog dismissal is tested against a local stub process,
+  not the real Pokémon client.
+
+Tests use temporary HOME/XDG paths, loopback TLS servers, stub dialogs, and local
+process fixtures. The built candidate and source companion were not installed or
+enabled. The existing game prefix, browser handler, desktop entry, and Hyprland
+configuration were not changed. Build version stamping is not a release: the
+published v0.4.1 binary does not include these features, and the new companion
+requires a matching launcher with status schema 1.
+
+Still required before publication: closed-game installed-candidate acceptance,
+real startup focus/dialog behavior, slow/rapid launch and repair flows, keyboard /
+vertical-bar / multi-monitor interaction, shell-restart survival, fresh browser
+sign-in and gameplay, clean-OS first-time tester coverage, and authenticated
+published-artifact acceptance under the existing release protections.
+
+## UX milestones 1–3 — live desktop smoke test, 2026-10-29
+
+Tested the working checkout as **0.5.0-dev** on the user's existing Omarchy
+4.0.6-1 desktop, Hyprland 0.56.2, Qt 6.12.0, and the existing managed
+GE-Proton11-7 runtime. Two displays were available, including a portrait display.
+Candidate SHA-256:
+
+```text
+4ca3343e20b5c7744662bcb276ae32aff920b1fbd075ea5ad5754418c3f98ea8
+```
+
+### Temporary deployment and preservation
+
+- Confirmed no game session was running before deployment. Backed up the installed
+  launcher, companion files, desktop integration, bar configuration, receipts,
+  and prefix registry files in a private test directory.
+- Temporarily installed the candidate and matching source companion. Immediately
+  after launcher installation, only the launcher executable and main desktop entry
+  differed: registry state, runtime selection, installation/integration receipts,
+  MIME preferences, and main/managed Hyprland configuration retained their hashes.
+- Existing login state was retained: the real game reached its signed-in home
+  screen. No match was started, no sign-out was requested, and no fresh browser
+  authentication was performed.
+- The user explicitly approved normal game shutdown to finish maintenance checks
+  and restoration. No game process was forcibly terminated.
+
+### Passed live checks
+
+- Actual compact companion displayed the running state and **Focus game** action.
+  Keyboard expansion of Maintenance and Escape dismissal worked. Modifying
+  maintenance actions were disabled while the game ran.
+- Repeated launch focused the same game window/PID. A separate launch during
+  startup also returned successfully without creating another game session.
+- The real app-menu desktop entry launched the game. Observed `idle → starting →
+  running`, with startup feedback, a tiled XWayland window, and no initial fullscreen.
+- Fullscreen round trip and workspace move/return succeeded. Horizontal tile
+  resizing changed the window from 846×1390 to 926×1390. An initial height-only
+  resize was ineffective because the tile occupied the full workspace height;
+  that was an unsuitable test axis, not evidence of a launcher regression.
+- The game retained its PID and running status through an Omarchy shell restart.
+  Normal shutdown returned status to idle and removed the play-session marker.
+- Companion summon mapped to the correct selected monitor on both displays.
+- Backend `update --check` was rejected during gameplay before any installer
+  operation; the successful installation receipt was unchanged.
+- Closed the real download progress window during an active transfer. The command
+  reported cancellation, preserved the verified cache and installation receipt,
+  and removed temporary transfer files.
+- A subsequent real `update --check --gui` downloaded the 187.4 MiB official MSI,
+  showed measured progress and a separate non-cancellable verification phase,
+  authenticated it, and displayed the unchanged-installer result. The receipt did
+  not advance; Windows Installer was not invoked.
+- The actual updates overview and diagnostic report opened and dismissed normally.
+  The repair confirmation was cancelled, with no repair applied.
+- Saved support reports through both CLI and the real graphical file chooser.
+  Both exports were mode 0600 and omitted personal paths and callback URLs.
+
+### Deployment observation
+
+Updating the existing companion files, rescanning, and disabling/re-enabling did
+not invalidate the running shell's cached QML/JavaScript: the first popup still
+showed the old controls. `omarchy restart shell` loaded the matching new controls.
+This is the local-update cache caveat already documented in the companion guide;
+do not count a successful rescan alone as proof that new companion code is active.
+
+### Restoration and limits
+
+Restored the original **v0.4.1** launcher, desktop entry, companion, and exact bar
+layout, then restarted the shell to reload the restored companion. All protected
+non-registry files matched their original hashes, the original active window was
+restored, the original companion opened, all **15** current diagnostics passed,
+and Hyprland reported no configuration errors. No game or test dialogs remained.
+Wine's `system.reg` and `user.reg` changed during normal game sessions; those live
+registry changes were deliberately retained, not rolled back. The game prefix was
+never reset and the selected Proton profile was not changed. Temporary screenshots
+were removed after review; none were added to the repository.
+
+Still unverified: fresh browser sign-in, a completed match with the candidate,
+vertical-bar layout, intentionally interrupted real MSI/runtime installation,
+application of a changed MSI or repair, clean-OS provisioning, and a new published
+release's artifact acceptance. Clipboard-copy behavior remains fixture-tested;
+the user's clipboard was not intentionally replaced for this test.
+
+## v0.5.0-rc.1 preparation — 2026-10-29
+
+Prepared an opt-in prerelease of the UX milestones and matching companion, not a
+stable promotion. The default bootstrap and companion install/upgrade helper still
+select stable v0.4.1; RC testers must explicitly use the candidate's commit-pinned
+release instructions. The companion requires status schema 1 from that candidate.
+
+- `make check`, `make check-shell`, `make test-plugin`, `make check-plugin`, and
+  `make build` passed with Go 1.27.3 and candidate version `0.5.0-rc.1`.
+- Fresh `go test -race -count=1 ./...` passed; module integrity passed and
+  `make security` found zero reachable vulnerabilities (one module-only finding).
+- The owner's full authenticated release-protection audit passed during readiness
+  review; it must pass again before approving the candidate's publication job.
+- The prior live desktop test above remains the desktop evidence; release
+  preparation did not deploy a launcher/companion or change the installed game.
+- An unreferenced local `tiling-demo-21s.mp4` was left untouched and excluded from
+  the release source.
+
+Hosted CI, exact rebuild, protected publication, and downloaded-artifact acceptance
+are separate release gates. Fresh login/gameplay, real repair/interruption recovery,
+vertical-bar interaction, and clean-OS first-install acceptance remain open before
+stable promotion or marketplace submission.
