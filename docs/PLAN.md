@@ -8,13 +8,14 @@ window. Use the official Windows client through UMU, GE-Proton, and XWayland.
 
 ## Current status and next work
 
-### UX milestones 1–3 — implemented in the checkout, 2026-10-29
+### UX milestones 1–3 — v0.5.0 stable promotion, 2026-10-29
 
-Published as **v0.5.0-rc.1**, not stable promotion. Hosted release/rebuild,
-downloaded-artifact authentication, and isolated launcher-only installation passed.
-Stable v0.4.1 remains Latest. Automated checks use fixtures and temporary HOME/XDG paths.
-A matching candidate was subsequently tested on the real desktop and the original
-installation restored; see the [live acceptance record](VALIDATION.md).
+The maintainer approved **v0.5.0** stable promotion after successful installed
+v0.5.0-rc.1 logout/browser-login and gameplay testing. The RC's hosted release/rebuild,
+downloaded-artifact authentication, and isolated launcher-only installation passed;
+repeat those artifact gates for the stable tag. The earlier temporary deployment
+was restored, then the published RC and matching companion were installed for the
+user's test. See the [live acceptance record](VALIDATION.md).
 
 - [x] Milestone 1: schema-1 local status API with validated lock ownership, stale
   marker rejection, startup feedback, repeat-launch waiting, compact expandable
@@ -32,12 +33,17 @@ installation restored; see the [live acceptance record](VALIDATION.md).
 - [x] Publish the opt-in v0.5.0-rc.1 candidate through protected main; verify exact
   hosted/local rebuilds, all artifact attestations, pinned bootstrap installation,
   isolated launcher-only reinstall preservation, and read-only official MSI verification.
-- [ ] Remaining desktop acceptance: vertical bar, slow/failing startup variants,
-  fresh browser login and completed match, actual interrupted MSI/runtime recovery,
+- [x] Installed RC acceptance: authenticated launcher upgrade and matching companion,
+  all 15 diagnostics, state/integration preservation, and user-confirmed logout/login
+  and gameplay. Stable promotion approved; no further runtime behavior changes.
+- [ ] Remaining desktop validation: vertical bar, slow/failing startup variants,
+  actual interrupted MSI/runtime recovery,
   changed-MSI application, and clipboard-copy behavior on the live desktop.
-- [ ] Clean-OS first-time tester before stable release or companion marketplace
-  submission. Repeat published-artifact acceptance for the eventual stable release.
-  Preserve existing release security gates.
+- [ ] Clean-OS first-time tester. The maintainer accepted this remaining validation
+  gap for stable promotion; it and the desktop follow-ups above are not marked passed.
+  Companion marketplace submission remains separate. Preserve release security gates.
+- [ ] Publish v0.5.0 and verify its own artifacts, attestations, exact rebuild, and
+  authenticated isolated launcher-only installation before announcing completion.
 
 See [companion controls and status protocol](PLUGIN.md) and
 [maintenance/recovery behavior](UPDATES.md).

@@ -137,9 +137,10 @@ launcher and never fall back to building `main`.
 
 ## 4. Make progress and recovery predictable
 
-Included in the v0.5.0 release candidate as UX milestone 2, with isolated regressions
-and existing-installation desktop smoke testing. Not in stable v0.4.1; real
-MSI/runtime recovery and clean-OS acceptance remain pending before stable promotion.
+Included in v0.5.0 as UX milestone 2, with isolated regressions and existing-installation
+desktop smoke testing. The maintainer approved stable promotion after the installed
+candidate's successful logout/login and gameplay test. Real MSI/runtime recovery
+and clean-OS acceptance remain unverified follow-ups, not completed checks.
 See [the milestone status](PLAN.md).
 
 - [x] Show downloading, verifying, extracting, and installing as distinct phases.

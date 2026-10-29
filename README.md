@@ -146,11 +146,10 @@ folder is optional until you add `config.json`.
 Play/focus, first-time installation, game maintenance, diagnostics, and folders.
 It uses the same launcher and graphical dialogs as the desktop app.
 
-The companion requires the **v0.5.0 release-candidate launcher** (live status
-schema 1); stable v0.4.1 is not compatible. First install the candidate using
-the pinned instructions in [v0.5.0-rc.1's release notes](https://github.com/hucKOder/omarchy-ptcgl/releases/tag/v0.5.0-rc.1),
-adding `--launcher-only` to the final `bash` command. The normal bootstrap and
-companion installer continue to select stable releases, not prereleases.
+The companion requires **launcher v0.5.0 or later** (live status schema 1).
+Older launchers produce an upgrade prompt. The panel's install/upgrade action
+uses the same authenticated stable-release installation as the normal bootstrap;
+launcher, companion, game, and Proton updates remain separate.
 
 To validate, copy, and enable the companion from a local checkout on Omarchy:
 
@@ -221,17 +220,16 @@ runtime rollback behavior.
 
 ## Commands
 
-### v0.5.0 release candidate
+### New in v0.5.0
 
-Milestones 1–3 are included in **v0.5.0-rc.1**, not in the stable v0.4.1
-launcher. They add live activity status, startup feedback, a compact companion,
+**v0.5.0** adds live activity status, startup feedback, a compact companion,
 measured download progress, recoverable interrupted installations, guided fixes,
 privacy-safe support reports, and a component update overview. Existing-installation
-desktop smoke testing passed; broader gameplay, recovery, and clean-OS acceptance
-are still required before a stable release. Select the candidate explicitly using
-its [pinned release instructions](https://github.com/hucKOder/omarchy-ptcgl/releases/tag/v0.5.0-rc.1),
-or use `make install-launcher` for a local build after closing the game.
-The default release bootstrap continues to select **stable** releases only.
+desktop smoke testing passed, and the user confirmed the installed release
+candidate's logout/browser-login and gameplay test. Clean-OS provisioning,
+vertical-bar interaction, and real interrupted-install recovery remain documented
+validation follow-ups; see [the validation record](docs/VALIDATION.md).
+The default bootstrap and companion installer select the latest **stable** release.
 
 The companion now requires **live status schema 1**. It prompts to upgrade when
 an older launcher lacks that protocol. Its default view shows status and one
@@ -269,10 +267,10 @@ labelled with its check date; it is not a claim about in-game patch freshness.
 | `repair [--gui]` | Reapply installer-managed game files |
 | `runtime-update [--gui]` | Select this launcher's bundled compatibility profile |
 | `doctor [--json\|--gui]` | Check dependencies, game installation, and desktop integration |
-| `doctor --save <file>` | Save a privacy-safe support report (v0.5.0 RC) |
-| `status [--json]` | Read installation readiness, activity, and safe actions without network access (v0.5.0 RC) |
-| `updates [--gui]` | Explain component versions and explicit update options (v0.5.0 RC) |
-| `fix [--gui] <integration\|setup\|repair\|runtime-update>` | Run an allowlisted recovery action; GUI actions ask for confirmation (v0.5.0 RC) |
+| `doctor --save <file>` | Save a privacy-safe support report (v0.5.0+) |
+| `status [--json]` | Read installation readiness, activity, and safe actions without network access (v0.5.0+) |
+| `updates [--gui]` | Explain component versions and explicit update options (v0.5.0+) |
+| `fix [--gui] <integration\|setup\|repair\|runtime-update>` | Run an allowlisted recovery action; GUI actions ask for confirmation (v0.5.0+) |
 | `open <game\|config\|cache>` | Open the selected folder in your default file manager |
 | `open --gui` | Choose a folder graphically |
 | `integrate` | Refresh the app-menu entry, browser callback, and window rules |

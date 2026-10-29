@@ -8,13 +8,11 @@ An Omarchy Quattro bar widget for the existing Pokémon TCG Live launcher. Click
 - Omarchy Quattro with its Quickshell bar and `qs.Ui` / `qs.Commons` modules.
 - x86-64 Linux, Lua Hyprland configuration (0.55+), XWayland/Vulkan, and 8 GB free
   for launcher/game installation.
-- A matching launcher with **status schema 1**, available in **v0.5.0-rc.1** but
-  not stable v0.4.1. Older launchers produce an upgrade prompt. Close the game and
-  use the candidate's [pinned release instructions](https://github.com/hucKOder/omarchy-ptcgl/releases/tag/v0.5.0-rc.1)
-  with `--launcher-only` on the final `bash` command, or build this checkout with
-  `make install-launcher`. The panel's authenticated installer selects the latest
-  **stable** release; it cannot install this candidate until a compatible stable
-  launcher is published.
+- Launcher **v0.5.0 or later** with **status schema 1**. Older launchers produce
+  an upgrade prompt. The panel's authenticated installer selects the latest stable
+  release. Independently pinned installation is also available in the selected
+  [release's notes](https://github.com/hucKOder/omarchy-ptcgl/releases), with
+  `--launcher-only` on the final `bash` command. Close the game before upgrading.
 - Bash, coreutils (`timeout`, `realpath`, `install`), util-linux (`flock`), and
   Omarchy's configured terminal. These are system tools available on Omarchy.
 
@@ -22,7 +20,7 @@ The companion's version is independent of the launcher version shown in its pane
 
 ## Install
 
-After explicitly installing the matching candidate launcher:
+Install and enable the companion source:
 
 ```sh
 omarchy plugin add https://github.com/hucKOder/omarchy-ptcgl.git --enable
@@ -52,11 +50,6 @@ omarchy bar move io.github.huckoder.ptcgl --section left
 ## First launch
 
 Adding/enabling a plugin does not install a launcher or run installation hooks.
-
-**Release-candidate testing:** install v0.5.0-rc.1 explicitly as described above
-before enabling the companion. The stable-install flow below still selects
-v0.4.1, which lacks status schema 1 and will leave the companion showing its
-upgrade prompt. Do not use it to upgrade or reinstall a candidate launcher.
 
 1. Open the PTCGL panel and choose **Install launcher** when needed.
 2. The configured terminal opens and runs this checkout's `bootstrap.sh` with
@@ -229,6 +222,16 @@ Rescan/disable/re-enable retained cached old QML/JavaScript on this host; restar
 the shell was necessary to load the candidate (and later the restored original).
 Verify visible controls/version after a local update. Vertical-bar layout and a
 complete gameplay acceptance remain open. See [the complete record](VALIDATION.md).
+
+### Installed RC and stable promotion, 2026-10-29
+
+The published v0.5.0-rc.1 launcher and matching companion were subsequently
+installed permanently for user testing. All 15 diagnostics passed, protected
+game/configuration state and bar layout were preserved, and a shell restart loaded
+the tagged companion. The user confirmed the requested logout/browser-login and
+play-session test worked and approved v0.5.0 stable release. Vertical-bar and
+clean-OS coverage remain unverified follow-ups; marketplace submission is separate.
+See [the installed acceptance record](VALIDATION.md).
 
 ## License and marketplace
 

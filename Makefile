@@ -1,5 +1,5 @@
 GO ?= go
-VERSION ?= 0.5.0-rc.1
+VERSION ?= 0.5.0
 
 .PHONY: build test check check-shell security test-plugin check-plugin install-plugin licenses install install-launcher uninstall clean
 build:

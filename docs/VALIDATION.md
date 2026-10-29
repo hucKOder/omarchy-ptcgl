@@ -620,3 +620,58 @@ before stable promotion or marketplace submission. A changed-MSI upgrade also ne
 its own record when a newer official installer is available. The published RC's
 authentication and isolated launcher-install acceptance are complete, not a claim
 that these remaining real-desktop/clean-OS checks passed.
+
+## Installed v0.5.0-rc.1 and user acceptance — 2026-10-29
+
+After the published-artifact checks above, the user requested installation of the
+candidate to perform the logout/login and play-session test personally.
+
+- Confirmed the game was closed and installation status was `ready` / `idle`.
+  Reauthenticated installer, manifest, and launcher against the exact RC/source
+  policy and hashes before installing.
+- Saved a private launcher/integration/companion backup, then ran the published
+  authenticated installer with explicit `v0.5.0-rc.1`, source
+  `fd3136382613d5b8028fbad1c9cfea7fbb1199ae`, and `--launcher-only`.
+  No game setup, repair, or runtime update was invoked; dependencies were present.
+- Updated the installed hand-copied companion to the exact tagged source and
+  restarted the Omarchy shell to clear cached old QML/JavaScript. The existing
+  bar layout was retained; no plugin source edits were made for the local upgrade.
+- Installed launcher SHA-256 matched the published RC:
+  `bfc75de58ddcc924505d1f9f0057f2cf46e5f49a0121899ef60c58d92a38897e`.
+  All 15 diagnostics passed, companion validation passed, and Hyprland reload
+  reported no configuration errors.
+- All 17 protected file snapshots were unchanged after installation, including
+  the existing registry files/game executable, receipt, runtime selection,
+  configuration, MIME handler preferences, managed/main Hyprland configuration,
+  and bar configuration. Missing optional files remained absent. The main desktop
+  entry and companion intentionally gained the new controls.
+- Backup and installed verification are private under
+  `~/.local/state/ptcgl-omarchy/upgrade-v0.5.0-rc.1-u4o5jdrt/`.
+
+The user subsequently reported **“everything works fine. We can do release”** in
+response to the planned logout/browser-login and play-session test. This records
+user-confirmed acceptance, including the requested browser-return/gameplay/graphics
+and audio check, not an agent-observed match or a fresh-prefix provisioning test.
+No source-level authentication fix or additional runtime change was needed.
+
+The maintainer approved stable **v0.5.0** promotion on this evidence. Real repair and
+interrupted MSI/runtime recovery, vertical-bar interaction, clipboard-copy behavior,
+slow/failing startup variants, and clean-OS/first-time-tester coverage remain unverified
+follow-ups accepted for this release; a changed-MSI upgrade still needs a newer
+official installer. They are not silently marked passed. Stable publication must
+still pass the existing protected-main, vulnerability, exact-rebuild, approval, and
+artifact-authentication gates. Release preparation does not replace the installed
+RC or touch an active game session.
+
+### Stable preparation checks
+
+The only runtime source difference from the tested RC is `Version = "0.5.0"`;
+launcher behavior, companion code, installers, dependency pins, and release gates
+are unchanged. Stable-facing documentation and generated notes now describe the
+successful user test and retain the unverified follow-ups explicitly.
+
+`make check`, `make check-shell`, all 11 companion contract tests,
+`make check-plugin`, `make build`, and fresh `go test -race -count=1 ./...` passed.
+Module integrity passed; `make security` found zero reachable vulnerabilities
+(one module-only advisory). The full authenticated release-protection audit passed
+during preparation and must pass again before protected publication approval.
