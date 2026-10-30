@@ -22,10 +22,10 @@ func releaseTree(t *testing.T) string {
 		t.Fatal(err)
 	}
 	root := filepath.Join(t.TempDir(), "release tree with spaces")
-	fixture(t, filepath.Join(root, "scripts/release-assets.sh"), string(script), 0600)
-	fixture(t, filepath.Join(root, "scripts/release-notes.md.in"), string(template), 0600)
-	fixture(t, filepath.Join(root, "install.sh"), "reviewed installer\n", 0600)
-	fixture(t, filepath.Join(root, "build/ptcgl-omarchy"), "built launcher\n", 0755)
+	fixture(t, filepath.Join(root, "scripts/release-assets.sh"), string(script), 0o600)
+	fixture(t, filepath.Join(root, "scripts/release-notes.md.in"), string(template), 0o600)
+	fixture(t, filepath.Join(root, "install.sh"), "reviewed installer\n", 0o600)
+	fixture(t, filepath.Join(root, "build/ptcgl-omarchy"), "built launcher\n", 0o755)
 	return root
 }
 
@@ -177,7 +177,7 @@ if [[ $1 == attestation && $2 == verify ]]; then
 fi
 [[ $1 == release && $2 == create ]]
 printf '%s\n' "$@" > "$TEST_RELEASE_ARGS"
-`, 0755)
+`, 0o755)
 			for _, name := range []string{"bash", "cp"} {
 				path, err := exec.LookPath(name)
 				if err != nil {
@@ -188,10 +188,10 @@ printf '%s\n' "$@" > "$TEST_RELEASE_ARGS"
 				}
 			}
 			for _, name := range []string{"install.sh", "release.json", "ptcgl-omarchy-linux-amd64"} {
-				fixture(t, filepath.Join(root, "release", name), "artifact\n", 0600)
+				fixture(t, filepath.Join(root, "release", name), "artifact\n", 0o600)
 			}
-			fixture(t, filepath.Join(root, "bundle.json"), "attestation bundle\n", 0600)
-			fixture(t, filepath.Join(root, "release/notes.md"), "Generated release instructions\n", 0600)
+			fixture(t, filepath.Join(root, "bundle.json"), "attestation bundle\n", 0o600)
+			fixture(t, filepath.Join(root, "release/notes.md"), "Generated release instructions\n", 0o600)
 			argsPath := filepath.Join(root, "release-args")
 			cmd := exec.Command("bash", "-e", "-o", "pipefail")
 			cmd.Dir = root

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"ptcgl-omarchy/internal/desktop"
 )
 
 func doctorApp(t *testing.T) (*App, *fakeRunner) {
@@ -16,10 +18,10 @@ func doctorApp(t *testing.T) (*App, *fakeRunner) {
 	t.Setenv("HYPRLAND_INSTANCE_SIGNATURE", "test-session")
 	readyRuntime(t, a)
 	writeTestFile(t, a.gamePath(), []byte("game"))
-	for name, content := range a.desktopFiles() {
+	for name, content := range desktop.Files(a.Paths.Bin) {
 		writeTestFile(t, filepath.Join(a.Paths.Applications, name), content)
 	}
-	writeTestFile(t, filepath.Join(a.Paths.Hypr, "hyprland.lua"), []byte(managedBlock(filepath.Join(a.Paths.Hypr, Name+".lua"))))
+	writeTestFile(t, filepath.Join(a.Paths.Hypr, "hyprland.lua"), []byte(desktop.ManagedBlock(filepath.Join(a.Paths.Hypr, Name+".lua"))))
 	rules, _ := assets.ReadFile("assets/ptcgl-omarchy.lua")
 	writeTestFile(t, filepath.Join(a.Paths.Hypr, Name+".lua"), rules)
 	r.output = func(c Command) ([]byte, error) {
@@ -130,7 +132,7 @@ func TestDoctorExplainsFailures(t *testing.T) {
 				if err := os.Remove(path); err != nil {
 					t.Fatal(err)
 				}
-				if err := os.Mkdir(path, 0700); err != nil {
+				if err := os.Mkdir(path, 0o700); err != nil {
 					t.Fatal(err)
 				}
 			},

@@ -2,80 +2,25 @@ package app
 
 import (
 	"context"
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"ptcgl-omarchy/internal/desktop"
 )
 
-const desktopID = "ptcgl-omarchy.desktop"
-const callbackID = "ptcgl-omarchy-callback.desktop"
-const callbackMIME = "x-scheme-handler/tpcitcgapp"
-const blockBegin = "-- BEGIN ptcgl-omarchy"
-const blockEnd = "-- END ptcgl-omarchy"
-
-//go:embed assets/ptcgl-omarchy.desktop.in
-var desktopTemplate string
-
-//go:embed assets/ptcgl-omarchy-callback.desktop.in
-var callbackTemplate string
+const (
+	desktopID    = desktop.DesktopID
+	callbackID   = desktop.CallbackID
+	callbackMIME = desktop.CallbackMIME
+)
 
 type Integration struct {
 	PreviousHandler string `json:"previous_handler"`
 	HadHandler      bool   `json:"had_handler"`
-}
-
-func desktopQuote(s string) string {
-	// Desktop Exec fields are not shell commands; literal % needs doubling.
-	s = strings.ReplaceAll(s, "%", "%%")
-	for _, char := range []string{`\`, `"`, "`", "$"} {
-		s = strings.ReplaceAll(s, char, `\`+char)
-	}
-	// Backslashes are also escaped in the desktop-file string layer.
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	return `"` + s + `"`
-}
-
-func luaQuote(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `"`, `\"`)
-	s = strings.ReplaceAll(s, "\n", `\n`)
-	s = strings.ReplaceAll(s, "\r", `\r`)
-	return `"` + s + `"`
-}
-
-func managedBlock(path string) string {
-	return blockBegin + "\ndofile(" + luaQuote(path) + ")\n" + blockEnd + "\n"
-}
-
-func removeBlock(source string) (string, error) {
-	start := strings.Index(source, blockBegin)
-	if start < 0 {
-		if strings.Contains(source, blockEnd) {
-			return "", fmt.Errorf("incomplete ptcgl-omarchy config block")
-		}
-		return source, nil
-	}
-	end := strings.Index(source[start:], blockEnd)
-	if end < 0 || strings.Contains(source[start+len(blockBegin):], blockBegin) {
-		return "", fmt.Errorf("ambiguous ptcgl-omarchy config block")
-	}
-	end += start + len(blockEnd)
-	if end < len(source) && source[end] == '\n' {
-		end++
-	}
-	return source[:start] + source[end:], nil
-}
-
-func (a *App) desktopFiles() map[string][]byte {
-	exe := desktopQuote(a.Paths.Bin)
-	return map[string][]byte{
-		desktopID:  []byte(strings.ReplaceAll(desktopTemplate, "@EXEC@", exe)),
-		callbackID: []byte(strings.ReplaceAll(callbackTemplate, "@EXEC@", exe)),
-	}
 }
 
 func (a *App) integrationState() (Integration, error) {
@@ -101,7 +46,7 @@ func (a *App) InstallSelf(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if err := AtomicWrite(a.Paths.Bin, b, 0755); err != nil {
+		if err := AtomicWrite(a.Paths.Bin, b, 0o755); err != nil {
 			return err
 		}
 		return a.integrate(ctx)
@@ -124,7 +69,7 @@ func (a *App) integrate(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("Omarchy Lua config required at %s", main)
 	}
-	clean, err := removeBlock(string(original))
+	clean, err := desktop.RemoveBlock(string(original))
 	if err != nil {
 		return err
 	}
@@ -134,23 +79,23 @@ func (a *App) integrate(ctx context.Context) error {
 	if oldRuleErr == nil && !strings.Contains(string(oldRule), "Managed by ptcgl-omarchy") {
 		return fmt.Errorf("%s already exists and is not managed by this tool", rule)
 	}
-	updated := strings.TrimRight(clean, "\n") + "\n\n" + managedBlock(rule)
-	if err := AtomicWrite(rule, rules, 0644); err != nil {
+	updated := strings.TrimRight(clean, "\n") + "\n\n" + desktop.ManagedBlock(rule)
+	if err := AtomicWrite(rule, rules, 0o644); err != nil {
 		return err
 	}
 	if string(original) != updated {
 		backup := main + ".bak.ptcgl-omarchy." + time.Now().UTC().Format("20060102T150405.000000000")
-		if err := AtomicWrite(backup, original, 0600); err != nil {
+		if err := AtomicWrite(backup, original, 0o600); err != nil {
 			return err
 		}
-		if err := AtomicWrite(main, []byte(updated), 0644); err != nil {
+		if err := AtomicWrite(main, []byte(updated), 0o644); err != nil {
 			return err
 		}
 	}
 	if err := a.validateHypr(ctx); err != nil {
-		_ = AtomicWrite(main, original, 0644)
+		_ = AtomicWrite(main, original, 0o644)
 		if oldRuleErr == nil {
-			_ = AtomicWrite(rule, oldRule, 0644)
+			_ = AtomicWrite(rule, oldRule, 0o644)
 		} else {
 			_ = os.Remove(rule)
 		}
@@ -175,9 +120,9 @@ func (a *App) integrate(ctx context.Context) error {
 	} else if err != nil {
 		return err
 	}
-	for name, content := range a.desktopFiles() {
+	for name, content := range desktop.Files(a.Paths.Bin) {
 		path := filepath.Join(a.Paths.Applications, name)
-		if err := AtomicWrite(path, content, 0644); err != nil {
+		if err := AtomicWrite(path, content, 0o644); err != nil {
 			return err
 		}
 		if _, err := a.LookPath("desktop-file-validate"); err == nil {
@@ -188,7 +133,7 @@ func (a *App) integrate(ctx context.Context) error {
 	}
 	icon, _ := assets.ReadFile("assets/ptcgl-omarchy.svg")
 	iconPath := filepath.Join(filepath.Dir(a.Paths.Data), "icons/hicolor/scalable/apps/ptcgl-omarchy.svg")
-	if err := AtomicWrite(iconPath, icon, 0644); err != nil {
+	if err := AtomicWrite(iconPath, icon, 0o644); err != nil {
 		return err
 	}
 	if _, err := a.LookPath("update-desktop-database"); err == nil {
@@ -250,9 +195,9 @@ func (a *App) Uninstall(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			clean := removeMIMEReference(string(b))
+			clean := desktop.RemoveMIMEReference(string(b))
 			if clean != string(b) {
-				if err := AtomicWrite(path, []byte(clean), 0600); err != nil {
+				if err := AtomicWrite(path, []byte(clean), 0o600); err != nil {
 					return err
 				}
 			}
@@ -262,21 +207,21 @@ func (a *App) Uninstall(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		clean, err := removeBlock(string(original))
+		clean, err := desktop.RemoveBlock(string(original))
 		if err != nil {
 			return err
 		}
 		if clean != string(original) {
 			backup := main + ".bak.ptcgl-omarchy." + time.Now().UTC().Format("20060102T150405.000000000")
-			if err := AtomicWrite(backup, original, 0600); err != nil {
+			if err := AtomicWrite(backup, original, 0o600); err != nil {
 				return err
 			}
-			if err := AtomicWrite(main, []byte(clean), 0644); err != nil {
+			if err := AtomicWrite(main, []byte(clean), 0o644); err != nil {
 				return err
 			}
 		}
 		if err := a.validateHypr(ctx); err != nil {
-			_ = AtomicWrite(main, original, 0644)
+			_ = AtomicWrite(main, original, 0o644)
 			_ = a.validateHypr(ctx)
 			return err
 		}
@@ -297,32 +242,4 @@ func (a *App) Uninstall(ctx context.Context) error {
 		a.progress("Removed launcher integration. Game data is available at " + a.Paths.Data)
 		return nil
 	})
-}
-
-func removeMIMEReference(source string) string {
-	var result []string
-	for _, line := range strings.Split(source, "\n") {
-		key, value, found := strings.Cut(line, "=")
-		if !found || strings.TrimSpace(key) != callbackMIME {
-			result = append(result, line)
-			continue
-		}
-		var kept []string
-		removed := false
-		for _, id := range strings.Split(value, ";") {
-			if strings.TrimSpace(id) == callbackID {
-				removed = true
-			} else if id != "" {
-				kept = append(kept, id)
-			}
-		}
-		if !removed {
-			result = append(result, line)
-			continue
-		}
-		if len(kept) > 0 {
-			result = append(result, key+"="+strings.Join(kept, ";")+";")
-		}
-	}
-	return strings.Join(result, "\n")
 }

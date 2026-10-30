@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ptcgl-omarchy/internal/process"
 )
 
 func TestStatusIsReadOnlyAndIgnoresStaleMarkers(t *testing.T) {
@@ -92,7 +94,7 @@ func TestUnknownBusySessionDoesNotEnableActions(t *testing.T) {
 func ownedWindowFixture(t *testing.T, a *App) Window {
 	t.Helper()
 	cmd := exec.Command("/usr/bin/sleep", "30")
-	cmd.Env = environment(map[string]string{"WINEPREFIX": a.Paths.Prefix})
+	cmd.Env = process.Environment(map[string]string{"WINEPREFIX": a.Paths.Prefix})
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}

@@ -1,4 +1,4 @@
-package app
+package verify
 
 import (
 	"context"
@@ -49,9 +49,11 @@ func TestSignedRevocationLists(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC().Truncate(time.Second)
-	caTemplate := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Test CA"},
+	caTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Test CA"},
 		NotBefore: now.Add(-24 * time.Hour), NotAfter: now.Add(24 * time.Hour), IsCA: true,
-		BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign}
+		BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
 	ca := testCertificate(t, key, caTemplate, caTemplate)
 	leaf := &x509.Certificate{SerialNumber: big.NewInt(2), CRLDistributionPoints: []string{"http://example.test/list.crl"}}
 	for _, mode := range []string{"valid", "revoked", "stale", "future", "tampered", "other issuer", "matching scope", "other scope", "partial reasons", "indirect", "CA only", "delta", "unknown critical"} {
@@ -107,9 +109,11 @@ func TestMSIVerifierEnforcesOnlineRevocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC().Truncate(time.Second)
-	caTemplate := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Test CA"},
+	caTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Test CA"},
 		NotBefore: now.Add(-24 * time.Hour), NotAfter: now.Add(24 * time.Hour), IsCA: true,
-		BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign}
+		BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
 	ca := testCertificate(t, key, caTemplate, caTemplate)
 	roots := x509.NewCertPool()
 	roots.AddCert(ca)
@@ -124,11 +128,13 @@ func TestMSIVerifierEnforcesOnlineRevocation(t *testing.T) {
 				_, _ = w.Write(body)
 			}))
 			defer server.Close()
-			leafTemplate := &x509.Certificate{SerialNumber: big.NewInt(2),
-				Subject:   pkix.Name{CommonName: pokemonPublisher, Organization: []string{pokemonPublisher}},
-				NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour),
+			leafTemplate := &x509.Certificate{
+				SerialNumber: big.NewInt(2),
+				Subject:      pkix.Name{CommonName: pokemonPublisher, Organization: []string{pokemonPublisher}},
+				NotBefore:    now.Add(-time.Hour), NotAfter: now.Add(time.Hour),
 				KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
-				CRLDistributionPoints: []string{server.URL}}
+				CRLDistributionPoints: []string{server.URL},
+			}
 			leaf := testCertificate(t, key, leafTemplate, ca)
 			cert := &certloader.Certificate{Leaf: leaf, PrivateKey: key, Certificates: []*x509.Certificate{leaf, ca}}
 			list := &x509.RevocationList{Number: big.NewInt(1), ThisUpdate: now.Add(-time.Hour), NextUpdate: now.Add(time.Hour)}
@@ -139,8 +145,10 @@ func TestMSIVerifierEnforcesOnlineRevocation(t *testing.T) {
 					tsaTemplate := *leafTemplate
 					tsaTemplate.SerialNumber = big.NewInt(serial)
 					tsaTemplate.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping}
-					tsaTemplate.ExtraExtensions = []pkix.Extension{{Id: asn1.ObjectIdentifier{2, 5, 29, 37}, Critical: true,
-						Value: crlDER(t, []asn1.ObjectIdentifier{pkcs9.OidKeyPurposeTimeStamping})}}
+					tsaTemplate.ExtraExtensions = []pkix.Extension{{
+						Id: asn1.ObjectIdentifier{2, 5, 29, 37}, Critical: true,
+						Value: crlDER(t, []asn1.ObjectIdentifier{pkcs9.OidKeyPurposeTimeStamping}),
+					}}
 					tsa := testCertificate(t, key, &tsaTemplate, ca)
 					cert.Timestamper = testTimestamper{&certloader.Certificate{Leaf: tsa, PrivateKey: key, Certificates: []*x509.Certificate{tsa, ca}}, now.Add(-10 * time.Minute)}
 				}

@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"ptcgl-omarchy/internal/process"
 )
 
 const gameRelative = "drive_c/users/steamuser/The Pokémon Company International/Pokémon Trading Card Game Live/Pokemon TCG Live.exe"
@@ -32,7 +34,7 @@ func (a *App) gameReady() bool {
 }
 
 func (a *App) umu(args ...string) Command {
-	return Command{Name: "umu-run", Args: args, Env: environment(map[string]string{
+	return Command{Name: "umu-run", Args: args, Env: process.Environment(map[string]string{
 		"GAMEID": "0", "WINEPREFIX": a.Paths.Prefix, "PROTONPATH": a.protonPath(),
 		"UMU_CONTAINER_NSENTER": "1", "PROTON_VERB": "waitforexitandrun",
 	})}
@@ -56,7 +58,7 @@ func (a *App) bootstrap(ctx context.Context) error {
 	}
 	if !a.prefixReady() {
 		a.phase("initializing", "Initializing the game prefix…")
-		if err := os.MkdirAll(filepath.Dir(a.Paths.Prefix), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(a.Paths.Prefix), 0o700); err != nil {
 			return err
 		}
 		if err := a.Runner.Run(ctx, a.umu("")); err != nil {
@@ -261,8 +263,12 @@ func (a *App) verifyInstaller(ctx context.Context, path string) error {
 	}
 	// Keep parsing in a child process so cancellation and the deadline can stop
 	// verification even if a malformed compound document stalls the parser.
-	_, err = a.Runner.Output(verifyCtx, Command{Name: self, Args: []string{"__verify-installer", path}, Env: environment(nil)})
+	_, err = a.Runner.Output(verifyCtx, Command{Name: self, Args: []string{"__verify-installer", path}, Env: process.Environment(nil)})
 	if err != nil {
+		var cleanupErr *process.CleanupError
+		if errors.As(err, &cleanupErr) {
+			return fmt.Errorf("installer verification cleanup failed: %w", cleanupErr)
+		}
 		return fmt.Errorf("installer signature, certificate, or publisher verification failed")
 	}
 	return nil

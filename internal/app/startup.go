@@ -38,8 +38,9 @@ func (a *App) startupFeedback(ctx context.Context) func() {
 			return
 		}
 		// Extra-button output is a fixed label, never subprocess/game output.
-		closed := make(chan error, 1)
-		go func() { closed <- cmd.Wait() }()
+		closed := make(chan struct{})
+		// The dialog's exit status is not actionable; output identifies the button.
+		go func() { _ = cmd.Wait(); close(closed) }()
 		finish := func() {
 			_, _ = io.WriteString(pipe, "100\n")
 			_ = pipe.Close()

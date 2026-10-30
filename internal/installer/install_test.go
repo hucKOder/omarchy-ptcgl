@@ -11,8 +11,10 @@ import (
 	"testing"
 )
 
-const releaseVersion = "v0.4.0"
-const releaseCommit = "0123456789abcdef0123456789abcdef01234567"
+const (
+	releaseVersion = "v0.4.0"
+	releaseCommit  = "0123456789abcdef0123456789abcdef01234567"
+)
 
 const launcherFixture = `#!/bin/bash
 set -e
@@ -28,7 +30,7 @@ esac
 
 func fixture(t *testing.T, path, content string, mode os.FileMode) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, []byte(content), mode); err != nil {
@@ -114,9 +116,9 @@ func releaseFixtures(t *testing.T, root, mode, script string) {
 	if mode == "bundle-malformed" {
 		bundleData = "invalid attestation bundle"
 	}
-	fixture(t, filepath.Join(root, "release.json"), manifestData, 0600)
-	fixture(t, filepath.Join(root, "release.sigstore.json"), bundleData, 0600)
-	fixture(t, filepath.Join(root, "release-launcher"), launcher, 0600)
+	fixture(t, filepath.Join(root, "release.json"), manifestData, 0o600)
+	fixture(t, filepath.Join(root, "release.sigstore.json"), bundleData, 0o600)
+	fixture(t, filepath.Join(root, "release-launcher"), launcher, 0o600)
 }
 
 func TestInstaller(t *testing.T) {
@@ -302,7 +304,7 @@ func TestInstaller(t *testing.T) {
 			tmp := filepath.Join(root, "tmp")
 			config := filepath.Join(root, "custom config")
 			for _, dir := range []string{home, bin, tmp} {
-				if err := os.MkdirAll(dir, 0700); err != nil {
+				if err := os.MkdirAll(dir, 0o700); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -318,52 +320,52 @@ func TestInstaller(t *testing.T) {
 				}
 			}
 			if !tt.noVerifier {
-				fixture(t, filepath.Join(bin, "osslsigncode"), "#!/bin/bash\nexit 0\n", 0755)
+				fixture(t, filepath.Join(bin, "osslsigncode"), "#!/bin/bash\nexit 0\n", 0o755)
 			}
 			for _, name := range []string{"yay", "paru", "makepkg", "pacman", "sudo"} {
 				fixture(t, filepath.Join(bin, name), `#!/bin/bash
 printf 'forbidden %s %s\n' "${0##*/}" "$*" >> "$TEST_LOG"
 exit 1
-`, 0755)
+`, 0o755)
 			}
 			if !tt.noConfig {
-				fixture(t, filepath.Join(config, "hypr/hyprland.lua"), "-- existing config\n", 0600)
+				fixture(t, filepath.Join(config, "hypr/hyprland.lua"), "-- existing config\n", 0o600)
 			}
 			installScript := filepath.Join(root, "checkout/install.sh")
-			fixture(t, installScript, string(script), 0600)
+			fixture(t, installScript, string(script), 0o600)
 			quickPath := filepath.Join(root, "bootstrap.sh")
-			fixture(t, quickPath, string(quickScript), 0600)
+			fixture(t, quickPath, string(quickScript), 0o600)
 			installedPath := filepath.Join(home, ".local/bin/ptcgl-omarchy")
-			fixture(t, installedPath, "existing launcher\n", 0755)
+			fixture(t, installedPath, "existing launcher\n", 0o755)
 			if tt.local {
-				fixture(t, filepath.Join(root, "checkout/go.mod"), "module ptcgl-omarchy\n", 0600)
-				fixture(t, filepath.Join(root, "checkout/cmd/ptcgl-omarchy/main.go"), "package main\n", 0600)
+				fixture(t, filepath.Join(root, "checkout/go.mod"), "module ptcgl-omarchy\n", 0o600)
+				fixture(t, filepath.Join(root, "checkout/cmd/ptcgl-omarchy/main.go"), "package main\n", 0o600)
 			}
-			fixture(t, filepath.Join(root, "launcher"), launcherFixture, 0755)
+			fixture(t, filepath.Join(root, "launcher"), launcherFixture, 0o755)
 			releaseFixtures(t, root, tt.downloadMode, string(script))
 			selectedRelease := releaseVersion
 			if tt.downloadMode == "api-old-release" {
 				selectedRelease = "v0.3.0"
 			}
-			fixture(t, filepath.Join(root, "api-release.json"), fmt.Sprintf(`{"tag_name":%q}`, selectedRelease), 0600)
+			fixture(t, filepath.Join(root, "api-release.json"), fmt.Sprintf(`{"tag_name":%q}`, selectedRelease), 0o600)
 			objectType := "commit"
 			if tt.downloadMode == "api-annotated" {
 				objectType = "tag"
 			} else if tt.downloadMode == "api-invalid-ref" {
 				objectType = "tree"
 			}
-			fixture(t, filepath.Join(root, "api-ref.json"), fmt.Sprintf(`{"object":{"sha":%q,"type":%q}}`, releaseCommit, objectType), 0600)
-			fixture(t, filepath.Join(root, "api-tag.json"), fmt.Sprintf(`{"object":{"sha":%q,"type":"commit"}}`, releaseCommit), 0600)
+			fixture(t, filepath.Join(root, "api-ref.json"), fmt.Sprintf(`{"object":{"sha":%q,"type":%q}}`, releaseCommit, objectType), 0o600)
+			fixture(t, filepath.Join(root, "api-tag.json"), fmt.Sprintf(`{"object":{"sha":%q,"type":"commit"}}`, releaseCommit), 0o600)
 			downloadedInstaller := string(script)
 			if tt.downloadMode == "bootstrap-tampered" {
 				downloadedInstaller = "#!/bin/bash\nprintf 'unverified bootstrap ran\\n' >> \"$TEST_LOG\"\n"
 			}
-			fixture(t, filepath.Join(root, "downloaded-installer"), downloadedInstaller, 0600)
-			fixture(t, filepath.Join(bin, "uname"), "#!/bin/bash\ncase $1 in -s) printf 'Linux\\n';; -m) printf 'x86_64\\n';; esac\n", 0755)
+			fixture(t, filepath.Join(root, "downloaded-installer"), downloadedInstaller, 0o600)
+			fixture(t, filepath.Join(bin, "uname"), "#!/bin/bash\ncase $1 in -s) printf 'Linux\\n';; -m) printf 'x86_64\\n';; esac\n", 0o755)
 			fixture(t, filepath.Join(bin, "omarchy"), `#!/bin/bash
 printf 'omarchy %s\n' "$*" >> "$TEST_LOG"
 [[ ${TEST_PKG_FAIL:-0} != 1 ]]
-`, 0755)
+`, 0o755)
 			fixture(t, filepath.Join(bin, "curl"), `#!/bin/bash
 set -e
 printf 'curl %s\n' "$*" >> "$TEST_LOG"
@@ -392,7 +394,7 @@ case "$url" in
   "$base/ptcgl-omarchy-linux-amd64") cp "$TEST_FIXTURES/release-launcher" "$dest" ;;
   *) exit 1 ;;
 esac
-`, 0755)
+`, 0o755)
 			if !tt.noGH {
 				fixture(t, filepath.Join(bin, "gh"), `#!/bin/bash
 set -euo pipefail
@@ -436,19 +438,19 @@ jq -e --arg hash "${hash%% *}" --arg repo "${policy[--repo]}" \
   .source_commit == $commit and .signer_commit == $signer and
   .runner == "github-hosted" and .predicate == $predicate
 ' "${policy[--bundle]}" >/dev/null
-`, 0755)
+`, 0o755)
 			}
 			fixture(t, filepath.Join(bin, "git"), `#!/bin/bash
 printf 'git %s\n' "$*" >> "$TEST_LOG"
 mkdir -p "${@: -1}"
-`, 0755)
+`, 0o755)
 			fixture(t, filepath.Join(bin, "make"), `#!/bin/bash
 set -e
 printf 'make %s\n' "$*" >> "$TEST_LOG"
 [[ $1 == -C && $3 == build ]]
 mkdir -p "$2/build"
 cp "$TEST_FIXTURES/launcher" "$2/build/ptcgl-omarchy"
-`, 0755)
+`, 0o755)
 			args := []string{"--release", releaseVersion, "--source-commit", releaseCommit}
 			if tt.local {
 				args = []string{"--local"}

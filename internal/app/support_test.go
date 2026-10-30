@@ -196,7 +196,7 @@ func TestCopyReportExcludesLocalDiagnosticDetails(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "clipboard.txt")
 	copyPath := filepath.Join(os.Getenv("PATH"), "wl-copy")
 	script := "#!/bin/sh\nwhile IFS= read -r line; do printf '%s\\n' \"$line\"; done > '" + path + "'\n"
-	if err := os.WriteFile(copyPath, []byte(script), 0700); err != nil {
+	if err := os.WriteFile(copyPath, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.DiagnosticsGUI(context.Background()); err != nil {
@@ -229,7 +229,7 @@ func TestCLISavesPrivateSupportReportEvenWhenChecksFail(t *testing.T) {
 		t.Fatalf("unsafe or empty export: %s", b)
 	}
 	info, err := os.Stat(path)
-	if err != nil || info.Mode().Perm() != 0600 {
+	if err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatal("report is not private")
 	}
 }

@@ -675,3 +675,436 @@ successful user test and retain the unverified follow-ups explicitly.
 Module integrity passed; `make security` found zero reachable vulnerabilities
 (one module-only advisory). The full authenticated release-protection audit passed
 during preparation and must pass again before protected publication approval.
+
+## Refactor desktop acceptance and portrait startup failure — 2026-10-29/30
+
+The first refactor smoke test was not a successful login/gameplay acceptance:
+the user reported a second black window after browser login and a stall at 61/61.
+A retry with the candidate handling both launch and callback also stalled. A
+callback worker returning successfully proved delivery was started, not that the
+game completed authentication or reached its menu.
+
+A private diagnostic build changed only the normal `-nolog` arguments to Unity
+logging through captured stderr, filtering sensitive output before saving it.
+At the stall Unity reported that scene `MainMenu_3` could not be loaded. Read-only
+inspection of the installed client's scene list found `MainMenu_3_Landscape`,
+and its scene-selection method chose `MainMenu_3` when screen width was less than
+height. The failing tiled window measured 701×1248.
+
+After a reboot, a fresh diagnostic candidate passed all 15 doctor checks. A
+temporary, game-only floating resize changed the initial 701×1248 tile to a
+1280×721 landscape window before initialization completed. The user confirmed:
+“no more stuck i am in game can play.” No portrait-scene load error appeared in
+this run. This successful attempt reused existing login state; no new browser
+callback was observed, and a completed online match was not recorded.
+
+The installed launcher, saved window rules, runtime selection, and game data
+were not repaired or replaced. No cache was cleared. The diagnostic launch used
+temporary callback routing with restoration to the installed handler. The game
+was left open for the user. A permanent portrait-safe launch/layout policy is
+still outstanding; keep the game window wider than tall in the meantime. This
+result does not validate arbitrary portrait tile sizes or every scene transition.
+
+## Permanent landscape fallback and normal candidate — 2026-10-30
+
+The working source now requests windowed 1280×720 for both Play and callback
+delivery, retaining `-nolog`; the detached callback `Start` behavior described
+here was later superseded by the bounded helper cleanup below. Play owns a
+100 ms landscape observer until the game exits. It leaves landscape/square tiles
+alone; a portrait game window in this prefix is taken out of portrait fullscreen
+if necessary, floated, resized to 1280×720, and given `keep_aspect_ratio` for mouse
+resizing. The observer handles every matching owned window, including subsequent
+callback windows, rather than stopping at the first window/menu. Each mutation
+rechecks address, PID and prefix ownership. Explicit foreign prefix variables
+cannot be overridden by a game-path argument. Other applications, prefixes and
+workspaces are not targeted; the correction does not dispatch focus.
+
+**Policy limits:** corrected windows stay floating for the session; they are not
+automatically retiled. A user may retile into a landscape layout. Keyboard resize,
+retiling and portrait-monitor fullscreen are corrected reactively, not atomically.
+Keep the game wider than tall before authentication and menu/match transitions;
+arbitrary portrait tiling is not supported. A scene selection during an intentional
+portrait resize can still race the observer. Protection requires the launcher and
+a working compositor to remain alive. Compositor failures appear as a fixed,
+privacy-safe warning in companion status and do not stop the game. Transient
+failures are retried; unconfirmed observer subprocess cleanup propagates through
+Play and retains the existing persistent safety guard.
+
+No saved Hyprland rules or user Hyprland configuration were changed. The legacy
+wiki rule URLs returned 404; current official rule/dispatcher documentation was
+read from `hyprwm/hyprland-wiki` under `content/configuring/core/`, with dispatcher
+availability checked against installed `/usr/share/hypr/stubs/hl.meta.lua`, Omarchy
+tiling helpers, and the official Hyprland v0.56.2 implementation. In particular,
+floating uses idempotent `action = 'enable'`, not toggle.
+
+Regression tests cover landscape no-op, narrow startup, later callback windows
+and portrait/fullscreen scene layouts, invalid/reused/disappearing window identity,
+foreign ownership, compositor query/JSON/dispatch/rejection/clamping failures,
+observer cancellation/join/recovery, retained cleanup guards, and matching private
+launch/callback flags. `make fmt`, `make fmt-check`, `make lint`, `make check`, fresh
+`go test -race -count=1 ./...`, `make check-shell`, all 11 `make test-plugin` tests,
+read-only `make check-plugin`, and `git diff --check` passed. A release-style
+`CGO_ENABLED=0`, readonly-module, trimpath, stripped build passed in a unique
+`/tmp/opencode` directory (existing `build/` comparison binaries were preserved).
+`make security` verified module integrity and found zero reachable vulnerabilities,
+zero imported-package vulnerabilities, and one module-only advisory.
+
+### Installed update and live evidence
+
+Before launching, the user's updated installed binary was inspected rather than
+replaced: version 0.5.0, clean source revision
+`72fc50a2956ee1954f7f74d05ce42fa2d65f9c4e`, SHA-256
+`eb6b817b5fce8684b9ba34badf76cf104179b95551ca5544d1204501f6f43d30`.
+This differs from the refactored working source and its landscape candidate.
+Both installed and candidate preflight reported ready/idle, all 15 doctor checks
+passed, and there was no game window, cleanup guard, session/operation marker or
+pending installer. No repair, reinstall, credential reset, cache wipe or runtime
+upgrade was performed.
+
+At 07:44:57 UTC, normal unmodified-source candidate Play was started from
+`/tmp/opencode/ptcgl-landscape-normal-hF0mja49/ptcgl-omarchy`, SHA-256
+`e77ade4e7613e60b53c5f92ed03ecfea51991262171931b4ef3c09c785445b24`.
+UMU runtime updating was disabled for this test only. There was no diagnostic
+overlay, Unity log override or external geometry watcher. The private supervisor
+discards process output and records only fixed session/callback events, never URLs.
+The normal launcher itself produced a floating **1280×721** XWayland game window
+on monitor 1, workspace 2. The first pre-correction dimensions were not captured.
+Status reports running with maintenance disabled and no layout warning; that alone
+does **not** prove successful authentication, main-menu arrival or gameplay.
+
+At the initial checkpoint the candidate game was left open for user testing. Fresh browser authentication,
+menu/match scene acceptance and a completed online match remain **pending user
+confirmation**; no callback dispatch had been observed at this checkpoint. Existing
+stored login must not be counted as fresh browser authentication. Temporary
+callback routing points to this same candidate while it is open; the installed
+callback desktop file is untouched. The supervisor restores only its own MIME
+association on normal session exit, preserving unrelated concurrent preference
+edits or a concurrent replacement of that association. Restoration is pending
+while this test session remains open. No launcher installation, commit or release
+publication was performed.
+
+At the final read-only checkpoint there was exactly one owned game window, still
+1280×721 and floating, with no layout warning. `/proc` confirmed the active launcher
+is the candidate above, not the installed binary. The installed binary hash and
+callback entry remained unchanged. The active Play lock, session marker and
+prearmed operation guard are intentionally present until Play exits; they are not
+a stale guard to delete or bypass. A dry comparison confirmed that restoring just
+the temporary MIME key reproduces the original preferences bytes when no concurrent
+preference edits occur.
+
+### Normal candidate session completed — 2026-10-30
+
+The private event record subsequently observed a normal candidate callback dispatch
+at **07:49:51 UTC**. This confirms that callback delivery was started with the
+matching candidate, not successful authentication or menu arrival. No callback URL
+or authorization value was recorded.
+
+Normal Play exited with status **0 at 08:24:57 UTC**, without an agent-issued close
+or restart. The supervisor restored `ptcgl-omarchy-callback.desktop` as the original
+default handler and removed its uniquely named temporary desktop entry. A read-only
+check confirmed that MIME preferences match their original bytes exactly, installed
+binary and callback-entry hashes are unchanged, status is ready/idle, and operation,
+Play-session, cleanup-guard and pending-installer markers are absent. No new session
+was started. The earlier open-session checkpoint above is historical; restoration
+is now complete. Fresh-login success, menu/match scene acceptance and a completed
+online match still require user confirmation and are not inferred from callback
+dispatch or clean exit.
+
+## Fresh browser return leaves a persistent helper — 2026-10-30
+
+The user subsequently reported: **“I logged out and logged back in. I am back in
+game but now there is a black window opened.”** This is user-confirmed fresh
+browser sign-in/menu arrival in the normal candidate above, **not full acceptance**:
+the duplicate black window remains a failure, and no completed online match has
+been confirmed for this candidate.
+
+### Read-only live findings
+
+The temporary supervisor recorded one `callback-dispatch-started` event at
+07:49:51 UTC. The association still targets
+`ptcgl-omarchy-validation-hF0mja49.desktop`, whose wrapper invokes the same candidate
+SHA-256 recorded above. The installed v0.5.0 binary retains its recorded hash;
+there is no evidence of a mismatched installed callback handling this return.
+
+Inspection checked process UID, executable identity, the game executable argument,
+and resolved prefix ownership before reporting game-window metadata. Only fixed
+callback-scheme presence was retained, never callback arguments, tokens or raw
+environment data. Both windows are owned XWayland `steam_app_0` clients on monitor
+1, workspace 2:
+
+| Role / evidence | PID / address | Start UTC | First observed layout |
+| --- | --- | --- | --- |
+| Original Play game, no callback argument | 43050 / `0x55dc02ec6910` | 07:45:04 | floating 1280×721 |
+| Callback-launched game executable, callback-scheme argument present | 49441 / `0x55dc030952c0` | 07:49:51 | tiled 701×619 |
+
+The second process has Unity/Mono mapped and remained alive for more than twelve
+minutes after the callback. Between the 07:53:39 and 08:02:36 observations its CPU
+time advanced at approximately one full core. It is a persistent game-engine
+process, not merely the short-lived browser URI wrapper or a launcher dialog.
+The original game PID/address remained present throughout.
+
+The helper was already landscape and tiled at the first inspection, so the
+landscape observer has no correction to perform in that state. By 08:02:36 the
+same helper was floating 1280×720; the transition was not captured, and the normal
+landscape observer remained active. No diagnostic geometry/focus dispatcher was
+issued. These snapshots do not establish every earlier layout transition, but
+the persistent extra process was observable before that later floating layout.
+Do not attribute its creation or persistence to a measured observer resize.
+
+### Expected helper lifecycle, unresolved hang
+
+Source comparison shows that launching the game executable with the raw callback,
+`runinprefix`, quiet output and detached `Start` predates the refactor. The landscape
+change adds window-size/fullscreen arguments; it does not add a second callback
+launch or change detached process lifetime. Installed UMU 1.4.4 routes namespace
+re-entry through `steam-runtime-launch-client`; installed Proton's `runinprefix`
+executes the supplied game command rather than forwarding it without a process.
+The live callback process tree matches that route. Both live game processes have
+`lsteamclient` disabled; that is not an observed difference explaining this hang.
+
+Read-only static metadata/IL inspection of installed `TPCI.RainierClient.dll`
+(SHA-256 `e7f20887ff93dcb2c4fdd48f0881e33eb7aa6632fb52d0503b086b9dcf8aaced`)
+shows `EndPreload.UpdateDeepLinkSimulator` handing a supported callback to
+`DeepLinkSimulator.SetDeepLink` / `UnityEngine.PlayerPrefs.SetString`, followed by
+`UnityEngine.Application.Quit(0)`. Thus a helper launch is expected, but indefinite
+survival is not its intended lifecycle. This is static control-flow evidence,
+**not proof that this live process reached or returned from Quit**. No live
+PlayerPrefs, registry credentials or authentication payloads were read, and no
+proprietary files were changed. Quiet callback stdout/stderr are `/dev/null`;
+there is no captured Unity callback log for this session.
+
+A Unity/Wine helper-exit hang is the leading explanation, not a confirmed native
+root cause or an established launcher fix. No hide, close, timeout, kill,
+headless-mode change or replacement authentication transport was added. A next
+targeted diagnostic is a native stack-only backtrace of the independently
+identified helper, with arguments/locals disabled and identity rechecked. It
+requires user consent to briefly pause that helper; no debugger was attached.
+
+### Regression coverage, checks and preservation
+
+Only tests and this validation record changed during this investigation; runtime
+source was not changed. `internal/app/landscape_test.go` now models independent
+owned primary/helper PIDs with the observed 1280×721 floating and 701×619 tiled
+layouts, in either compositor order and across repeated observations. It asserts
+only read-only client queries, with neither window mutated. The existing portrait
+callback regression now also uses a distinct process instead of reusing the
+primary PID. These tests do not simulate Unity shutdown or prove a duplicate fix.
+
+`make fmt`, `make fmt-check`, `make lint`, `make check`, fresh
+`go test -race -count=1 ./...`, `make check-shell`, all 11 `make test-plugin` tests,
+read-only `make check-plugin`, and `git diff --check` passed. Formatting changed
+only the edited test file. `make security` verified modules and reported zero
+reachable/imported-package vulnerabilities, with one module-only advisory.
+A separate release-style build succeeded at
+`/tmp/opencode/ptcgl-black-window-build-2u06xv8l/ptcgl-omarchy`, SHA-256
+`d6ca66c07acd8737cf51ebe16ef691e8bb723e1514096328c1c4efc538c46fb5`, version
+`0.5.0-black-window-review`. It was neither launched nor installed and contains no
+runtime fix. Private sanitized evidence/check logs are under
+`/tmp/opencode/ptcgl-black-window-readonly-1vdesbet/`, with the later full snapshot
+under `/tmp/opencode/ptcgl-black-window-readonly-10s4fx4n/`.
+
+Both live game processes/windows were left open. Status remained ready/running,
+maintenance disabled, with the active Play lock/session/operation safety guard
+intact and no layout warning. The existing supervisor (PID 42292) remains active:
+on normal Play exit it restores only its own MIME association to the original
+installed handler and removes its uniquely named temporary desktop entry,
+preserving concurrent preference edits. Restoration is still pending while this
+session is open. The installed launcher, running candidate, game data, saved
+desktop configuration, unrelated refactor work and user video were not replaced
+or reset. No logout/login, shutdown, repair, cache clearing, commit or publication
+was performed by this investigation. Duplicate-free fresh return and a completed
+online match remain pending acceptance.
+
+### Authorized backtrace deferred after identity recheck — 2026-10-30
+
+The user authorized a brief, argument/local-free native backtrace of **only the
+verified callback helper**, leaving the working game untouched. Before attaching,
+the 08:07:39–08:08:49 UTC read-only checks found a changed session: original game
+PID 43050 was absent, and no replacement game process/window was identified in the
+owned prefix. PID 49441 retained its previous start identity, callback-scheme
+marker, runtime executable, prefix ownership and mapped game/Unity modules, but
+was now the **only** owned game window (floating 1280×720). Other owned Wine
+processes had neither the game executable nor UnityPlayer mapped.
+
+This proves callback provenance, not that the remaining window is still merely
+a black helper rather than the user's current game. Because permission excluded
+pausing the working game, no debugger attach or pause was attempted pending user
+confirmation of the remaining window's role. No detach or resume signal was
+needed; no process was closed, killed or restarted by the diagnostic. The reason
+or exact time the original game exited is unknown; no crash has been established.
+
+GDB 18.1 is installed, and the read-only Yama ptrace policy is 1. No permission
+denial was tested, no privilege escalation or policy change was attempted, and
+there is no new native stack evidence. Operation/status still reports running
+with maintenance disabled, and the matching temporary callback handler,
+supervisor and safety markers remain active. Sanitized identity/window/module
+evidence is private under
+`/tmp/opencode/ptcgl-black-window-readonly-tbva_fzm/`. Only this documentation was
+changed for the deferred attempt; no runtime source or test changes were made.
+
+### Authorized helper-only native trace — 2026-10-30
+
+The user clarified: **“I have closed the game i cannot for some reason close the
+hanging window.”** This establishes that the working primary was closed by the
+user, not by the investigation, and identifies the remaining window as the hung
+helper. Immediately before attachment, checks again required the same helper
+start identity (PID 49441, start ticks 258639), UID, exact Proton Wine executable,
+resolved prefix, callback-scheme marker and window address. Enumeration of owned
+Wine processes with UnityPlayer mapped found no replacement game. The helper
+had 62 threads, one running and 61 sleeping; none was stopped or traced.
+
+Unprivileged GDB 18.1 attached at 08:14:57 UTC, captured all 62 native stacks and
+detached normally. Debugger wall time was **0.206197 s**; the main thread's
+observed stopped interval was approximately **0.111420 s**, sampled every 10 ms
+(not an exact scheduler measurement). Stack collection itself took 0.021239 s.
+All 62 tasks were checked after detach, not just the process leader: one was
+running and 61 sleeping, all `TracerPid` values were zero, and none was stopped.
+There was no timeout, ptrace denial, privilege escalation, emergency SIGCONT or
+force-close. No other process was attached, paused or signalled.
+
+The main native stack was:
+
+```text
+getrusage                         libc.so.6
+NtYieldExecution                  ntdll.so
+__wine_syscall_dispatcher         ntdll.so
+server_init_process_done          ntdll.so
+main                             wine
+```
+
+The 61 workers comprised 23 single-object fsync waits, 29
+`NtWaitForAlertByThreadId` waits, two Wine window/message waits, one multiple-object
+fsync wait, and six Mesa Radeon condition-variable waits. Together with sustained
+near-one-core CPU usage on the main thread, this supports a busy yielding-loop
+hang rather than a main thread blocked in a GPU wait or futex. It does **not**
+establish which Unity operation is looping or prove a GPU/runtime root cause.
+The native unwind did not expose the Windows/Unity caller across Wine's syscall
+bridge; the older Unix loader frames are not evidence of a new startup stall.
+The expected callback `Application.Quit(0)` path makes an exit/shutdown hang
+plausible, but its exact live Windows call site remains unconfirmed.
+
+GDB ran with `-q --nx --nh --batch`, frame arguments disabled, entry values
+disabled, auto-loading/debuginfod disabled, and inferior calls, memory/register
+writes and breakpoint/tracepoint insertion disabled. Only unwound PCs, sanitized
+symbol/module/source basenames, thread IDs/states and timing were retained.
+Unstructured debugger output was captured in memory and discarded, never written
+or displayed. No arguments, locals, expressions, stack-memory dump, core,
+credential data or Wine backtrace command was collected. The private filtered
+trace and post-detach thread checks are under
+`/tmp/opencode/ptcgl-helper-backtrace-__dngtve/`.
+
+At 08:17:03 UTC the same black helper remained floating 1280×720, with all 62
+threads untraced and unstopped. The original primary remained absent. The active
+Play lock, operation/session markers, prearmed safety guard and matching temporary
+callback association/supervisor remained intact; status still reports running
+with maintenance disabled. The persistent helper is not grounds to delete or
+bypass those markers. The installed launcher and running candidate were unchanged.
+
+No safe launcher-level correction follows from this stack alone, so no runtime
+source/test change, build or live fix was applied. Only this validation record
+changed for the trace; `git diff --check` passed. The existing regression tests
+and their earlier automated results are unchanged. The next recovery option,
+**only with explicit additional consent**, is a PID-bound force termination of
+this reverified hung helper alone, never its process group, wineserver or launcher.
+Before any such action, recheck that no working game has started; afterward verify
+the entire helper task set has exited, allow normal Play/supervisor cleanup and
+verify callback restoration without altering safety guards. No force termination
+has been performed. Duplicate-free fresh login and online-match acceptance remain
+unresolved.
+
+### Authorized helper-only termination and normal cleanup — 2026-10-30
+
+After the trace, the user explicitly approved force-closing only the hung
+callback helper. Fresh checks again found exactly its known game window and no
+replacement game. UID, exact Proton Wine executable, resolved prefix, game-path
+marker, callback provenance, PID **49441**, start ticks **258639**, and address
+`0x55dc030952c0` matched the prior capture. The candidate Play process and temporary
+supervisor still owned the session, and all 62 helper tasks were untraced.
+
+At **08:24:56.701 UTC**, one `SIGKILL` was sent with `pidfd_send_signal` through a
+fresh helper pidfd, with identity and no-new-game checks repeated after opening
+the descriptor. No process group, wineserver, launcher or unrelated process was
+signalled, and no game restart was issued. This was a consented recovery action,
+not a launcher policy or an authentication fix.
+
+Task-aware observation initially saw a zombie leader **and one still-running
+worker**, so that snapshot was explicitly not counted as termination. By the
+next observation, approximately 0.202 s after the signal, the pidfd indicated
+exit, the original process identity was absent and no helper tasks remained.
+The black window disappeared. The remaining runtime/session then exited through
+normal launcher lifecycle cleanup without further signals: Play and its
+supervisor were gone, the session flock was released, and the play-session,
+operation and prearmed cleanup-guard markers were absent by approximately
+0.603 s. No marker was manually deleted or bypassed.
+
+The supervisor recorded normal Play exit code **0** at 08:24:57.262 UTC and restored
+`ptcgl-omarchy-callback.desktop` itself, then removed its temporary desktop entry.
+The MIME preferences match the original pre-test bytes exactly. Its final
+preservation event confirms that both installed launcher and installed callback
+entry remained unchanged; installed/candidate hashes still match the earlier
+record. No callback association was manually changed during recovery.
+
+Post-cleanup status is **ready / idle**, maintenance is enabled, no owned game
+window or prefix process remains, and no previously tracked runtime/session
+process has live tasks. There is no remaining runtime child holding the Play
+lock and no dangling temporary callback route. No further termination or cleanup
+consent is needed for this completed recovery. Private sanitized signal,
+task-transition and restoration evidence is under
+`/tmp/opencode/ptcgl-helper-close-5r770f_g/`.
+
+Only this validation record changed for recovery; `git diff --check` passed.
+No runtime source change, automatic callback-kill workaround, build, installation,
+repair, cache clearing, new launch, commit or publication was performed. Existing
+uncommitted source work and the user video were preserved. The callback hang's
+exact Windows/Unity cause and a supported source fix remain unresolved; terminating
+the helper does not pass duplicate-free fresh-login or online-match acceptance.
+
+### Bounded callback helper cleanup — live accepted
+
+The launcher now supervises the callback helper instead of treating it as a
+fire-and-forget process. `Callback` runs the helper through the existing
+`Runner.Run` process-group path with a 30-second default bound. Landscape
+arguments, the restricted environment, `runinprefix`, quiet output and the
+no-logging policy are unchanged. If the helper has not exited by the deadline,
+the normal cleanup sends `SIGTERM`, escalates to `SIGKILL` after the existing
+grace period, and verifies all threads are gone. A confirmed timeout is treated
+as a completed handoff because static client inspection shows the helper writes
+the deep link and calls `Application.Quit(0)`; the helper is always secondary
+because `Callback` requires an active Play session. An unconfirmed cleanup is
+reported without exposing callback arguments. A helper that exits with a
+non-zero status after running is not treated as an authentication failure; the
+game remains the authority on whether the callback was accepted.
+
+This is a lifecycle mitigation for the observed Unity/Wine shutdown hang, not a
+native root-cause fix. Regression coverage asserts supervised `Run` rather than
+detached `Start`, the deadline, quiet/landscape/reduced environment,
+timeout-as-handoff, non-zero helper exit, cancellation before start, cleanup
+failure without secret leakage, and a real TERM-ignoring helper whose process
+group is killed and verified absent.
+
+A separate candidate (`0.5.0-callback-cleanup`, SHA-256
+`5af25a1d7d775559b2d11bac66c2e6f679038479271cf8302d289741944b4c42`) passed
+ready/idle preflight and all 15 doctor checks. The normal candidate Play started
+at 08:46:33 UTC with no diagnostic overlay or external geometry helper. The game
+window appeared at 1416×1248 and the landscape observer corrected it to
+1280×720 floating when needed. The user completed a fresh browser logout/login,
+reached the game, and confirmed an online match completed and returned to the
+menu.
+
+The callback helper window appeared at 08:48:00 UTC and disappeared by 08:48:04
+UTC, approximately 3.5 seconds later; the user confirmed it closed by itself
+right after login. No second black window remained. Because the helper exited
+before the 30-second deadline, the live run did not exercise the timeout kill;
+that path remains covered by the real TERM-ignoring-helper regression test. The
+user then closed Play normally at 08:53:54 UTC. Play exited 0, the supervisor
+restored `ptcgl-omarchy-callback.desktop`, and the session lock, cleanup guard,
+play-session marker and operation marker were all absent. No game window or
+owned game process remained. The installed `0.5.0` launcher and its SHA-256
+`eb6b817b5fce8684b9ba34badf76cf104179b95551ca5544d1204501f6f43d30` were
+unchanged; the candidate was not installed.
+
+`make fmt-check`, `make lint`, `make check`, fresh
+`go test -race -count=1 ./...`, `make security`, and `git diff --check` passed.
+Security reports zero reachable/imported-package vulnerabilities and one
+module-only advisory. No installed launcher, saved window rule or game data was
+changed.

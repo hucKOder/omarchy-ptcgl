@@ -34,18 +34,18 @@ func TestCompanionInstallation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
 			script := filepath.Join(root, "a checkout '$ with spaces", "scripts", "plugin-install.sh")
-			fixture(t, script, string(helper), 0600)
+			fixture(t, script, string(helper), 0o600)
 			log := filepath.Join(root, "arguments")
 			fixture(t, filepath.Join(filepath.Dir(filepath.Dir(script)), "bootstrap.sh"),
-				"#!/bin/bash\nprintf '%s\\n' \"$@\" > \"$TEST_LOG\"\n"+tt.bootstrap, 0600)
+				"#!/bin/bash\nprintf '%s\\n' \"$@\" > \"$TEST_LOG\"\n"+tt.bootstrap, 0o600)
 			state := tt.state
 			if state == "" {
 				state = filepath.Join(root, "custom state")
 			}
 			if tt.locked {
 				lockPath := filepath.Join(state, "ptcgl-omarchy", "companion-install.lock")
-				fixture(t, lockPath, "", 0600)
-				lock, err := os.OpenFile(lockPath, os.O_RDWR, 0600)
+				fixture(t, lockPath, "", 0o600)
+				lock, err := os.OpenFile(lockPath, os.O_RDWR, 0o600)
 				if err != nil {
 					t.Fatal(err)
 				}

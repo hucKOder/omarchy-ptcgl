@@ -7,11 +7,15 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"ptcgl-omarchy/internal/desktop"
+	"ptcgl-omarchy/internal/process"
 )
 
 func (a *App) Play(ctx context.Context, args []string) error {
@@ -35,7 +39,7 @@ func (a *App) play(ctx context.Context, args []string, feedback bool) error {
 			return err
 		}
 		a.phase("starting", "Starting Pokémon TCG Live…")
-		launchArgs := []string{a.gamePath(), "-screen-fullscreen", "0", "-nolog"}
+		launchArgs := append([]string{a.gamePath()}, gameWindowArgs()...)
 		launchArgs = append(launchArgs, a.Config.ExtraArgs...)
 		launchArgs = append(launchArgs, args...)
 		c := a.umu(launchArgs...)
@@ -50,10 +54,13 @@ func (a *App) play(ctx context.Context, args []string, feedback bool) error {
 			stop := a.startupFeedback(ctx)
 			defer stop()
 		}
-		if err := a.Runner.Run(ctx, c); err != nil {
-			return fmt.Errorf("game exited: %w", err)
+		stopLayout := a.startLandscape(ctx)
+		runErr := a.Runner.Run(ctx, c)
+		layoutErr := stopLayout()
+		if runErr != nil {
+			runErr = fmt.Errorf("game exited: %w", runErr)
 		}
-		return nil
+		return errors.Join(runErr, layoutErr)
 	})
 	if errors.Is(err, ErrBusy) {
 		if a.focusExisting(ctx) {
@@ -90,6 +97,11 @@ func (a *App) waitForExisting(ctx context.Context, limit time.Duration) error {
 }
 
 var ErrCallback = errors.New("invalid Pokémon authentication callback")
+
+// A callback helper only needs to hand the deep link to the running client.
+// It is expected to exit immediately after that handoff; this bound prevents a
+// Unity/Wine shutdown hang from leaving an invisible second game running.
+const defaultCallbackHelperTimeout = 30 * time.Second
 
 type PlaySession struct{ Proton, Game, Prefix string }
 
@@ -133,9 +145,10 @@ func (a *App) Callback(ctx context.Context, raw string) error {
 	if !exists(session.Game) || validateProton(session.Proton) != nil {
 		return fmt.Errorf("game runtime is unavailable")
 	}
-	c := a.umu(session.Game, raw, "-nolog")
+	callbackArgs := append([]string{session.Game, raw}, gameWindowArgs()...)
+	c := a.umu(callbackArgs...)
 	c.Dir, c.Quiet = filepath.Dir(session.Game), true
-	c.Env = environment(map[string]string{
+	c.Env = process.Environment(map[string]string{
 		"GAMEID": "0", "WINEPREFIX": session.Prefix, "PROTONPATH": session.Proton,
 		"PROTON_VERB": "runinprefix", "UMU_CONTAINER_NSENTER": "1",
 		"UMU_LOG": "error", "PROTON_LOG": "0", "WINEDEBUG": "-all", "STEAM_LINUX_RUNTIME_LOG": "0",
@@ -143,11 +156,36 @@ func (a *App) Callback(ctx context.Context, raw string) error {
 	if ctx.Err() != nil {
 		return fmt.Errorf("authentication callback was cancelled")
 	}
-	if err := a.Runner.Start(c); err != nil {
-		// Do not expose exec errors or arguments containing authorization material.
-		return fmt.Errorf("authentication callback could not be delivered")
+	timeout := a.callbackTimeout
+	if timeout <= 0 {
+		timeout = defaultCallbackHelperTimeout
 	}
-	return nil
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	err = a.Runner.Run(timeoutCtx, c)
+	if err == nil {
+		return nil
+	}
+	var cleanupErr *process.CleanupError
+	if errors.As(err, &cleanupErr) {
+		return fmt.Errorf("authentication callback helper did not stop cleanly; close the game and open diagnostics: %w", cleanupErr)
+	}
+	if (errors.Is(err, context.DeadlineExceeded) || timeoutCtx.Err() == context.DeadlineExceeded) && ctx.Err() == nil {
+		// The helper was started and had time to persist the deep link. It is
+		// only failing to exit; do not turn that into a browser-visible failure.
+		return nil
+	}
+	if errors.Is(err, context.Canceled) || ctx.Err() != nil {
+		return fmt.Errorf("authentication callback was cancelled")
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		// The helper ran; its exit status is not the authentication result. The
+		// game itself reports whether the callback was accepted.
+		return nil
+	}
+	// Do not expose exec errors or arguments containing authorization material.
+	return fmt.Errorf("authentication callback could not be delivered")
 }
 
 type Window struct {
@@ -157,6 +195,7 @@ type Window struct {
 	XWayland   bool   `json:"xwayland"`
 	Floating   bool   `json:"floating"`
 	Fullscreen int    `json:"fullscreen"`
+	Size       [2]int `json:"size"`
 }
 
 func gameTitle(title string) bool {
@@ -164,19 +203,31 @@ func gameTitle(title string) bool {
 }
 
 func (a *App) ownWindow(w Window) bool {
-	if !gameTitle(w.Title) || !w.XWayland {
+	if !gameTitle(w.Title) || !w.XWayland || w.PID <= 0 {
 		return false
 	}
 	// A second PTCGL installation can have the same title/class. Focus ours only.
 	env, _ := os.ReadFile(filepath.Join("/proc", strconv.Itoa(w.PID), "environ"))
+	prefixFound := false
 	for _, item := range strings.Split(string(env), "\x00") {
 		key, value, _ := strings.Cut(item, "=")
-		if (key == "WINEPREFIX" || key == "STEAM_COMPAT_DATA_PATH") && samePrefix(value, a.Paths.Prefix) {
+		if key == "WINEPREFIX" || key == "STEAM_COMPAT_DATA_PATH" {
+			if !samePrefix(value, a.Paths.Prefix) {
+				return false
+			}
+			prefixFound = true
+		}
+	}
+	if prefixFound {
+		return true
+	}
+	cmdline, _ := os.ReadFile(filepath.Join("/proc", strconv.Itoa(w.PID), "cmdline"))
+	for _, arg := range strings.Split(string(cmdline), "\x00") {
+		if arg == a.gamePath() {
 			return true
 		}
 	}
-	cmdline, _ := os.ReadFile(filepath.Join("/proc", strconv.Itoa(w.PID), "cmdline"))
-	return strings.Contains(string(cmdline), a.gamePath())
+	return false
 }
 
 func samePrefix(path, prefix string) bool {
@@ -202,11 +253,24 @@ func (a *App) focusExisting(ctx context.Context) bool {
 func (a *App) focusWindow(ctx context.Context, w Window) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	dispatch := "hl.dsp.focus({ window = " + luaQuote("address:"+w.Address) + " })"
+	dispatch := "hl.dsp.focus({ window = " + desktop.QuoteLua("address:"+w.Address) + " })"
 	return a.Runner.Run(ctx, Command{Name: "hyprctl", Args: []string{"dispatch", dispatch}, Quiet: true})
 }
 
 func (a *App) existingWindow(ctx context.Context) (*Window, error) {
+	windows, err := a.windows(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, w := range windows {
+		if a.ownWindow(w) {
+			return &w, nil
+		}
+	}
+	return nil, nil
+}
+
+func (a *App) windows(ctx context.Context) ([]Window, error) {
 	if os.Getenv("HYPRLAND_INSTANCE_SIGNATURE") == "" {
 		return nil, nil
 	}
@@ -220,10 +284,5 @@ func (a *App) existingWindow(ctx context.Context) (*Window, error) {
 	if json.Unmarshal(b, &windows) != nil {
 		return nil, fmt.Errorf("window status unavailable")
 	}
-	for _, w := range windows {
-		if a.ownWindow(w) {
-			return &w, nil
-		}
-	}
-	return nil, nil
+	return windows, nil
 }

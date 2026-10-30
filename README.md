@@ -29,15 +29,30 @@ workspaces, and use your usual window shortcuts.
 **Omarchy PTCGL** is a small Go installer and launcher. It runs the Windows game
 through **UMU + GE-Proton + XWayland**, with the desktop details handled for you:
 
-- **Tiled from the start.** Windowed startup and game-specific Hyprland rules
-  handle Wine's fixed-size hints. `Super + F` still toggles compositor fullscreen.
+- **Landscape tiles, safe fallback.** Windowed startup and game-specific Hyprland
+  rules handle Wine's fixed-size hints. Landscape tiles stay tiled; portrait game
+  windows float at 1280×720. `Super + F` still toggles compositor fullscreen on a
+  landscape display.
 - **Launch once, focus again.** Reopening the app focuses the existing game.
-- **Sign in through your browser.** The login callback returns to the running game.
+- **Sign in through your browser.** The login callback returns to the running game;
+  a short-lived helper is supervised and cleaned up if it fails to exit, avoiding
+  a lingering second black window.
 - **Keep your own game environment.** A dedicated prefix and pinned Proton build.
 - **Update on your terms.** Game patches, installer updates, and Proton upgrades
   have separate paths.
 
 After first-time setup, the app-menu entry opens straight into the game.
+
+The Windows client lacks portrait menu/match scenes. The launcher requests a
+1280×720 window and checks its own game windows throughout Play (including callback
+windows), correcting portrait sizes without changing other windows or workspaces.
+A corrected window stays floating for that session; mouse resizing preserves its
+aspect ratio. You can retile it into a landscape layout yourself. Keyboard resize,
+retiling and fullscreen on a portrait monitor are corrected reactively, not
+atomically: **keep the game wider than tall before login or scene/match changes**.
+Do not deliberately drag through portrait during a transition. Compositor failures
+are shown in companion status and never terminate a running game; protection
+requires the normal launcher to remain running in a working Hyprland session.
 
 ## Demo
 
@@ -220,6 +235,19 @@ runtime rollback behavior.
 
 ## Commands
 
+### New in v0.5.1
+
+**v0.5.1** adds landscape-safe game-window handling and bounded cleanup for the
+browser-login callback helper. A helper that fails to exit after handing off the
+deep link is now stopped after a short grace period, so it cannot leave a second
+black window behind. Fresh browser login, menu/match transitions, and a completed
+online match were confirmed against the candidate.
+
+This release also moves launcher internals into focused configuration, download,
+process, verification, CLI, and desktop packages. The CLI, JSON schemas, state
+files, installer verification, locking, desktop integration, and privacy behavior
+are unchanged.
+
 ### New in v0.5.0
 
 **v0.5.0** adds live activity status, startup feedback, a compact companion,
@@ -348,6 +376,8 @@ library for built-in MSI verification. Build and verify it with:
 
 ```bash
 make check
+make fmt-check
+make lint
 make test
 make check-shell
 make security
@@ -358,6 +388,9 @@ The v0.4.1 security release requires Go 1.27.3 or later to include compromised-C
 rejection. `make security` checks module integrity and reachable vulnerabilities
 with that selected build toolchain. `make check-shell` requires ShellCheck.
 See the [security audit and patch status](docs/SECURITY-AUDIT.md).
+Use `make fmt` to apply the pinned Go formatters; see
+[contributing](CONTRIBUTING.md) for the full development checklist and package
+structure.
 
 For the shell companion, `make test-plugin` runs its dependency-free JavaScript
 contract tests (Node.js 18+); `make check-plugin` validates its manifest and QML

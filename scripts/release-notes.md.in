@@ -3,23 +3,35 @@ Source commit: `@SOURCE_COMMIT@`
 
 ## Highlights
 
-- Live local status, startup feedback, and repeat-launch focus for the same game.
-- Compact Omarchy companion with activity-aware controls and status schema 1.
-- Measured download progress, download-only cancellation, and recoverable
-  interrupted managed-runtime/MSI setup without resetting the existing prefix.
-- Confirmed recovery actions, privacy-safe support reports, and separate
-  launcher/runtime/official-installer update information.
-- Updated Go crypto dependencies; existing MSI authentication, patched Go trust,
-  release protections, attestations, and independent rebuild gates are retained.
+- Browser-login callbacks are now supervised. The short-lived helper is bound to
+  30 seconds and cleaned up as a process group if Unity/Wine fails to exit, so it
+  cannot leave a second black window behind. The running game is never signalled.
+- Landscape protection. The launcher requests a 1280×720 window and keeps
+  landscape tiles tiled; owned portrait game/callback windows float for the
+  session because the Windows client does not ship its portrait menu/match scenes.
+- Launcher internals moved into focused configuration, download, process,
+  verification, CLI, and desktop packages. The CLI, JSON schemas, state files,
+  installer verification, locking, desktop integration, and privacy behavior are
+  unchanged.
+- The v0.5.0 maintenance experience remains available: live local status, the
+  compact companion with status schema 1, measured download progress, recoverable
+  interrupted setup, confirmed recovery actions, and privacy-safe support reports.
 
 ## Validation and known limits
 
-Promoted from the tested v0.5.0-rc.1 without runtime behavior changes beyond version
-stamping. Existing-installation desktop smoke testing passed, including startup/focus,
-measured downloads, diagnostics/report saving, and game survival through a shell
-restart. The user confirmed the installed candidate's logout/browser-login and
-gameplay test and approved stable release. See the
-[validation record](https://github.com/hucKOder/omarchy-ptcgl/blob/@SOURCE_COMMIT@/docs/VALIDATION.md).
+The candidate passed ready/idle preflight and all 15 doctor checks. A live run
+confirmed a fresh browser logout/login, a helper window that closed by itself
+within about 3.5 seconds, menu/match transitions, one completed online match, and
+a normal Play exit with the original callback handler restored and no session
+lock, cleanup guard, marker, game window, or owned game process left behind. See
+the [validation record](https://github.com/hucKOder/omarchy-ptcgl/blob/@SOURCE_COMMIT@/docs/VALIDATION.md).
+
+The live helper exited before its deadline, so the timeout kill itself is covered
+by a real-process regression test with a TERM-ignoring helper rather than by the
+live run. This is a lifecycle mitigation for the observed Unity/Wine shutdown
+hang, not a native root-cause fix. Window correction is reactive: arbitrary
+portrait scene transitions and atomic correction during intentional portrait
+resizes remain unsupported.
 
 Real repair/interrupted-install recovery, vertical-bar layout, and clean-OS
 provisioning remain unverified follow-ups accepted by the maintainer for this
@@ -27,9 +39,10 @@ release. Automated fixture coverage is not a claim that those real-machine check
 passed. Companion marketplace submission remains separate.
 
 The default bootstrap and companion's install/upgrade button select this stable
-release. Launcher v0.5.0 supplies the status schema required by the companion;
-its install/upgrade action no longer needs a prerelease pin. Close the game before
-installing or upgrading. Existing prefix and selected Proton runtime are retained.
+release. Launcher v0.5.0 or later supplies the status schema required by the
+companion; its install/upgrade action no longer needs a prerelease pin. Close the
+game before installing or upgrading. Existing prefix and selected Proton runtime
+are retained.
 
 ## Install
 

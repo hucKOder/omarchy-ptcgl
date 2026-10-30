@@ -173,7 +173,7 @@ func saveReportGUI(ctx context.Context, report string) error {
 	if path == "" {
 		return nil
 	}
-	return AtomicWrite(path, []byte(report), 0600)
+	return AtomicWrite(path, []byte(report), 0o600)
 }
 
 func (a *App) UpdatesSummary() string {

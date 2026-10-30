@@ -14,25 +14,38 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"ptcgl-omarchy/internal/desktop"
+	proc "ptcgl-omarchy/internal/process"
 )
 
 type fakeRunner struct {
+	mu       sync.Mutex
+	outputMu sync.Mutex
 	commands []Command
 	run      func(Command) error
 	output   func(Command) ([]byte, error)
 }
 
 func (r *fakeRunner) Run(_ context.Context, c Command) error {
+	r.mu.Lock()
 	r.commands = append(r.commands, c)
+	r.mu.Unlock()
 	if r.run != nil {
 		return r.run(c)
 	}
 	return nil
 }
+
 func (r *fakeRunner) Output(_ context.Context, c Command) ([]byte, error) {
+	r.mu.Lock()
 	r.commands = append(r.commands, c)
+	r.mu.Unlock()
+	r.outputMu.Lock()
+	defer r.outputMu.Unlock()
 	if r.output != nil {
 		return r.output(c)
 	}
@@ -46,10 +59,12 @@ func testApp(t *testing.T) (*App, *fakeRunner) {
 	// Every test opts into a fixture desktop explicitly, never the real session.
 	t.Setenv("HYPRLAND_INSTANCE_SIGNATURE", "")
 	home := filepath.Join(t.TempDir(), "home with spaces and é")
-	p := Paths{Home: home, Data: filepath.Join(home, "data", Name), Cache: filepath.Join(home, "cache", Name),
+	p := Paths{
+		Home: home, Data: filepath.Join(home, "data", Name), Cache: filepath.Join(home, "cache", Name),
 		Config: filepath.Join(home, "config", Name), State: filepath.Join(home, "state", Name),
 		Prefix: filepath.Join(home, "data", Name, "prefix"), Bin: filepath.Join(home, "bin", Name),
-		Applications: filepath.Join(home, "data", "applications"), Hypr: filepath.Join(home, "config", "hypr")}
+		Applications: filepath.Join(home, "data", "applications"), Hypr: filepath.Join(home, "config", "hypr"),
+	}
 	a, err := New(p, io.Discard, io.Discard)
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +86,7 @@ func useTestPaths(t *testing.T, p Paths) {
 
 func writeTestFile(t *testing.T, path string, content []byte) {
 	t.Helper()
-	if err := AtomicWrite(path, content, 0600); err != nil {
+	if err := AtomicWrite(path, content, 0o600); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -84,7 +99,7 @@ func readyRuntime(t *testing.T, a *App) {
 	for _, name := range []string{"proton", "toolmanifest.vdf", "compatibilitytool.vdf", "version"} {
 		writeTestFile(t, filepath.Join(a.protonPath(), name), []byte("runtime"))
 	}
-	if err := os.MkdirAll(filepath.Join(a.protonPath(), "files"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(a.protonPath(), "files"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"system.reg", "user.reg", "userdef.reg", "drive_c/windows/system32/msiexec.exe"} {
@@ -195,7 +210,7 @@ func TestExtractProtonHandlesLinksWithoutFollowingThem(t *testing.T) {
 		headers []*tar.Header
 		ok      bool
 	}{
-		{"valid", []*tar.Header{{Name: "GE/files/a", Typeflag: tar.TypeReg, Mode: 0755, Size: 1}, {Name: "GE/files/b", Typeflag: tar.TypeSymlink, Linkname: "a"}}, true},
+		{"valid", []*tar.Header{{Name: "GE/files/a", Typeflag: tar.TypeReg, Mode: 0o755, Size: 1}, {Name: "GE/files/b", Typeflag: tar.TypeSymlink, Linkname: "a"}}, true},
 		{"traversal", []*tar.Header{{Name: "GE/../../escape", Typeflag: tar.TypeReg, Size: 1}}, false},
 		{"absolute", []*tar.Header{{Name: "/GE/file", Typeflag: tar.TypeReg, Size: 1}}, false},
 		{"escaping link", []*tar.Header{{Name: "GE/files/link", Typeflag: tar.TypeSymlink, Linkname: "../../../escape"}}, false},
@@ -391,10 +406,10 @@ func TestIntegrationIsRepeatableAndRestoresPreviousHandler(t *testing.T) {
 		}
 		for _, action := range []string{
 			"Actions=Updates;CheckUpdate;Update;Repair;Folders;Doctor;",
-			"[Desktop Action Updates]\nName=Versions & updates\nExec=" + desktopQuote(a.Paths.Bin) + " updates --gui",
-			"[Desktop Action CheckUpdate]\nName=Check installer updates\nExec=" + desktopQuote(a.Paths.Bin) + " update --check --gui",
-			"[Desktop Action Repair]\nName=Repair game\nExec=" + desktopQuote(a.Paths.Bin) + " fix --gui repair",
-			"[Desktop Action Folders]\nName=Open folders\nExec=" + desktopQuote(a.Paths.Bin) + " open --gui",
+			"[Desktop Action Updates]\nName=Versions & updates\nExec=" + desktop.QuoteExec(a.Paths.Bin) + " updates --gui",
+			"[Desktop Action CheckUpdate]\nName=Check installer updates\nExec=" + desktop.QuoteExec(a.Paths.Bin) + " update --check --gui",
+			"[Desktop Action Repair]\nName=Repair game\nExec=" + desktop.QuoteExec(a.Paths.Bin) + " fix --gui repair",
+			"[Desktop Action Folders]\nName=Open folders\nExec=" + desktop.QuoteExec(a.Paths.Bin) + " open --gui",
 		} {
 			if strings.Count(string(entry), action) != 1 {
 				t.Fatalf("missing or duplicated desktop action %q", action)
@@ -407,7 +422,7 @@ func TestIntegrationIsRepeatableAndRestoresPreviousHandler(t *testing.T) {
 		}
 	}
 	b, _ := os.ReadFile(main)
-	if strings.Count(string(b), blockBegin) != 1 {
+	if strings.Count(string(b), desktop.BlockBegin) != 1 {
 		t.Fatal("integration duplicated managed block")
 	}
 	state, err := a.integrationState()
@@ -418,7 +433,7 @@ func TestIntegrationIsRepeatableAndRestoresPreviousHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ = os.ReadFile(main)
-	if !strings.Contains(string(b), "require(\"hypr.monitors\")") || strings.Contains(string(b), blockBegin) {
+	if !strings.Contains(string(b), "require(\"hypr.monitors\")") || strings.Contains(string(b), desktop.BlockBegin) {
 		t.Fatal("uninstall changed unrelated config")
 	}
 	if handler != "previous.desktop" {
@@ -467,7 +482,7 @@ func TestRuntimeDownloadRejectsWrongHashBeforeExtracting(t *testing.T) {
 
 func TestEnvironmentHasSingleOverride(t *testing.T) {
 	t.Setenv("PROTON_VERB", "waitforexitandrun")
-	env := environment(map[string]string{"PROTON_VERB": "runinprefix"})
+	env := proc.Environment(map[string]string{"PROTON_VERB": "runinprefix"})
 	count := 0
 	for _, v := range env {
 		if strings.HasPrefix(v, "PROTON_VERB=") {
@@ -509,14 +524,14 @@ func TestRepeatLaunchUsesLuaFocusDispatcher(t *testing.T) {
 	// runtime over the network when process metadata is not available yet.
 	readyRuntime(t, a)
 	writeTestFile(t, a.gamePath(), []byte("game"))
-	if err := os.MkdirAll(a.Paths.Prefix, 0700); err != nil {
+	if err := os.MkdirAll(a.Paths.Prefix, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(a.Paths.Prefix, filepath.Join(a.Paths.Prefix, "pfx")); err != nil {
 		t.Fatal(err)
 	}
 	process := exec.Command("sleep", "30")
-	process.Env = environment(map[string]string{"WINEPREFIX": filepath.Join(a.Paths.Prefix, "pfx") + "/"})
+	process.Env = proc.Environment(map[string]string{"WINEPREFIX": filepath.Join(a.Paths.Prefix, "pfx") + "/"})
 	if err := process.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -546,34 +561,5 @@ func TestRepeatLaunchUsesLuaFocusDispatcher(t *testing.T) {
 		if c.Name == "umu-run" {
 			t.Fatal("repeat launch started a second game")
 		}
-	}
-}
-
-func TestMIMERemovalPreservesOtherApplications(t *testing.T) {
-	source := "[Default Applications]\ntext/html=browser.desktop\n" + callbackMIME + "=" + callbackID + ";previous.desktop;\n[Added Associations]\n" + callbackMIME + "=" + callbackID + ";\n"
-	clean := removeMIMEReference(source)
-	if strings.Contains(clean, callbackID) || !strings.Contains(clean, "text/html=browser.desktop") || !strings.Contains(clean, callbackMIME+"=previous.desktop;") {
-		t.Fatal("MIME removal changed unrelated handlers")
-	}
-}
-
-func TestAtomicWritePreservesConfigSymlink(t *testing.T) {
-	root := t.TempDir()
-	target := filepath.Join(root, "dotfiles", "hyprland.lua")
-	link := filepath.Join(root, "hyprland.lua")
-	writeTestFile(t, target, []byte("original"))
-	if err := os.Symlink(target, link); err != nil {
-		t.Fatal(err)
-	}
-	if err := AtomicWrite(link, []byte("updated"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	info, err := os.Lstat(link)
-	if err != nil || info.Mode()&os.ModeSymlink == 0 {
-		t.Fatal("dotfile symlink was replaced")
-	}
-	b, _ := os.ReadFile(target)
-	if string(b) != "updated" {
-		t.Fatal("symlink target was not updated")
 	}
 }

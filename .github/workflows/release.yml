@@ -57,6 +57,8 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y shellcheck
       - run: make check-shell
       - run: make check
+      - run: make fmt-check
+      - run: make lint
       - run: make test-plugin
       - run: make test
       - name: Build versioned release assets

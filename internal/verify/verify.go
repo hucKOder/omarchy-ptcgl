@@ -1,4 +1,5 @@
-package app
+// Package verify authenticates official installers and their signing chains.
+package verify
 
 import (
 	"context"
@@ -15,6 +16,11 @@ import (
 )
 
 const pokemonPublisher = "The Pokemon Company International, Inc."
+
+// MSI verifies the installer using the system certificate authorities.
+func MSI(ctx context.Context, path string) error {
+	return verifyMSI(ctx, path, nil)
+}
 
 type verificationReader struct {
 	ctx context.Context
@@ -92,8 +98,10 @@ func verifyCertificate(ctx context.Context, sig pkcs7.Signature, roots *x509.Cer
 	for _, cert := range sig.Intermediates {
 		intermediates.AddCert(cert)
 	}
-	chains, err := cert.Verify(x509.VerifyOptions{Roots: roots, Intermediates: intermediates,
-		KeyUsages: []x509.ExtKeyUsage{usage}, CurrentTime: signedAt})
+	chains, err := cert.Verify(x509.VerifyOptions{
+		Roots: roots, Intermediates: intermediates,
+		KeyUsages: []x509.ExtKeyUsage{usage}, CurrentTime: signedAt,
+	})
 	if err != nil {
 		return err
 	}

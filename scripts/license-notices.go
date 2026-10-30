@@ -100,7 +100,7 @@ func main() {
 			err = fmt.Errorf("bundled license notices are outdated; run make licenses")
 		}
 	} else if err == nil {
-		err = os.WriteFile(destination, data, 0644)
+		err = os.WriteFile(destination, data, 0o644)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

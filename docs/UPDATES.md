@@ -1,5 +1,24 @@
 # Game and runtime updates
 
+## v0.5.1 callback and landscape reliability
+
+The v0.5.1 release bounds the short-lived browser-login helper. The helper is
+expected to hand the deep link to the running client and quit; if Unity/Wine
+fails to exit, the launcher now stops only that helper after a grace period. The
+running game is not signalled, and the helper cannot leave a second black window
+behind. Normal helper exits remain immediate. Callback arguments and subprocess
+output remain private.
+
+The same release requests a 1280×720 landscape window and protects portrait
+tiles by floating them for the session, because the Windows client does not ship
+its portrait menu/match scenes. Landscape tiles remain tiled. Internal packages
+were reorganized without changing the CLI, JSON schemas, state files, installer
+verification, locking, or desktop integration.
+
+Fresh browser login, helper cleanup, menu/match transitions, and a completed
+online match were confirmed on the candidate. See the
+[live validation record](VALIDATION.md).
+
 ## v0.5.0 maintenance experience
 
 The v0.5.0 release adds `updates [--gui]`, `status [--json]`, confirmed `fix --gui`
@@ -96,6 +115,18 @@ an error dialog. Close the game before using these maintenance actions.
 - One advisory session lock serializes setup, game lifetime, update, repair,
   integration, and runtime changes. Login callbacks bypass this lock only for
   an active game session.
+- Cancelled foreground subprocess groups receive SIGTERM, then SIGKILL after
+  five seconds. Cleanup checks individual threads, including workers whose main
+  thread has already exited. If cleanup cannot be confirmed within ten seconds
+  (including persistent `/proc` or signaling failures), the operation fails and
+  leaves a prearmed `process-cleanup-guard` in the launcher state directory.
+  Further operations refuse to change the prefix until reboot; the next operation
+  clears a guard from a previous boot. A launcher crash during an operation also
+  retains this conservative guard. Do not manually remove it while old processes
+  could still be running. Login callback delivery uses the bounded helper path
+  described above, not this foreground-operation guard. This is not a
+  cgroup sandbox: descendants that leave the process group, or processes hidden
+  from `/proc`, are outside these cleanup guarantees.
 - The v0.5.0+ GUI shows downloading/verifying/extracting/installing phases.
   Download cancellation removes temporary files and preserves verified cache.
   Cancellation through the dialog cannot terminate verification or Windows
