@@ -344,13 +344,24 @@ func TestStoppingLayoutObserverJoinsWithoutCancellingGame(t *testing.T) {
 
 func TestWindowOwnershipRejectsConflictingPrefix(t *testing.T) {
 	a, _ := testApp(t)
+	foreign := filepath.Join(t.TempDir(), "foreign")
 	cmd := exec.Command("bash", "-c", `exec -a "$0" sleep 30`, a.gamePath())
-	cmd.Env = process.Environment(map[string]string{"WINEPREFIX": filepath.Join(t.TempDir(), "foreign")})
+	cmd.Env = process.Environment(map[string]string{"WINEPREFIX": foreign})
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
 	w := Window{Title: "Pokemon TCG Live", XWayland: true, PID: cmd.Process.Pid}
+	// /proc can briefly expose pre-exec metadata even after Start returns.
+	// Wait for this fixture's explicit prefix before asserting ownership policy.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		env, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(cmd.Process.Pid), "environ"))
+		if err == nil && strings.Contains(string(env), "WINEPREFIX="+foreign) {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
 	if a.ownWindow(w) {
 		t.Fatal("game-path argument overrode explicit foreign prefix")
 	}
