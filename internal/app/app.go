@@ -3,15 +3,20 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"time"
+
+	"ptcgl-omarchy/internal/config"
+	"ptcgl-omarchy/internal/process"
 )
 
-var Version = "0.5.0"
+var Version = "0.5.1"
 
 type App struct {
 	Paths    Paths
@@ -20,8 +25,10 @@ type App struct {
 	Runner   Runner
 	Download Downloader
 	Out      io.Writer
-	Notify   func(string)
 	LookPath func(string) (string, error)
+	// Callback helpers are expected to hand off the deep link and quit. Keep a
+	// bound so a Unity/Wine shutdown hang cannot leave a second game window.
+	callbackTimeout time.Duration
 	// Progress is installed before an operation starts; callbacks receive no URLs,
 	// command arguments, or subprocess output.
 	Progress       func(ProgressEvent)
@@ -31,7 +38,7 @@ type App struct {
 }
 
 func New(p Paths, out, errOut io.Writer) (*App, error) {
-	c, err := LoadConfig(p)
+	c, err := config.LoadConfig(p)
 	if err != nil {
 		return nil, err
 	}
@@ -46,15 +53,15 @@ func New(p Paths, out, errOut io.Writer) (*App, error) {
 	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
-	return &App{Paths: p, Config: c, Profile: profile, Runner: OSRunner{out, errOut},
-		Download: NewDownloader(), Out: out, LookPath: exec.LookPath}, nil
+	return &App{
+		Paths: p, Config: c, Profile: profile, Runner: OSRunner{Out: out, Err: errOut},
+		Download: NewDownloader(), Out: out, LookPath: exec.LookPath,
+		callbackTimeout: defaultCallbackHelperTimeout,
+	}, nil
 }
 
 func (a *App) progress(message string) {
 	fmt.Fprintln(a.Out, message)
-	if a.Notify != nil {
-		a.Notify(message)
-	}
 }
 
 func (a *App) require(names ...string) error {
@@ -70,7 +77,7 @@ func (a *App) withLock(fn func() error) error {
 	return a.withOperation("maintenance", fn)
 }
 
-func (a *App) withOperation(kind string, fn func() error) error {
+func (a *App) withOperation(kind string, fn func() error) (result error) {
 	l, err := acquireLock(a.Paths)
 	if err != nil {
 		return err
@@ -112,7 +119,20 @@ func (a *App) withOperation(kind string, fn func() error) error {
 	if err := os.Remove(filepath.Join(a.Paths.State, "play-session.json")); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	return fn()
+	guard := filepath.Join(a.Paths.State, cleanupGuardName)
+	if err := AtomicWrite(guard, []byte(op.Boot+"\n"), 0o600); err != nil {
+		return fmt.Errorf("arm subprocess safety guard: %w", err)
+	}
+	// Deliberately not deferred: a panic/crash must retain the guard as well.
+	result = fn()
+	var cleanupErr *process.CleanupError
+	if errors.As(result, &cleanupErr) {
+		return fmt.Errorf("%w; safety guard retained at %s", result, guard)
+	}
+	if err := os.Remove(guard); err != nil {
+		return errors.Join(result, fmt.Errorf("clear subprocess safety guard: %w", err))
+	}
+	return result
 }
 
 func (a *App) Setup(ctx context.Context) error {

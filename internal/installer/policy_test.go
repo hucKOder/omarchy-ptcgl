@@ -97,7 +97,7 @@ func TestReleasePolicyFailsClosed(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				fixture(t, filepath.Join(root, name+".json"), string(data), 0600)
+				fixture(t, filepath.Join(root, name+".json"), string(data), 0o600)
 			}
 			fixture(t, filepath.Join(bin, "gh"), `#!/bin/bash
 set -euo pipefail
@@ -111,7 +111,7 @@ case "${*: -1}" in
   *) exit 2 ;;
 esac
 exec cat -- "$TEST_POLICY/$name.json"
-`, 0755)
+`, 0o755)
 			for _, tool := range []string{"bash", "jq", "mktemp", "rm", "cat"} {
 				path, err := exec.LookPath(tool)
 				if err != nil {

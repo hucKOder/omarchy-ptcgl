@@ -60,7 +60,7 @@ case "$1" in
   *) exit 2 ;;
 esac
 `
-	if err := os.WriteFile(filepath.Join(bin, "zenity"), []byte(script), 0700); err != nil {
+	if err := os.WriteFile(filepath.Join(bin, "zenity"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin)

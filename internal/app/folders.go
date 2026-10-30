@@ -51,8 +51,10 @@ func (a *App) ChooseFolder(ctx context.Context) error {
 	if err := a.require("zenity"); err != nil {
 		return err
 	}
-	args := []string{"--list", "--title=Pokémon TCG Live — Open folders", "--text=Choose a folder to open in your file manager.",
-		"--column=ID", "--column=Folder", "--column=Location", "--hide-column=1", "--print-column=1", "--ok-label=Open", "--width=900", "--height=300"}
+	args := []string{
+		"--list", "--title=Pokémon TCG Live — Open folders", "--text=Choose a folder to open in your file manager.",
+		"--column=ID", "--column=Folder", "--column=Location", "--hide-column=1", "--print-column=1", "--ok-label=Open", "--width=900", "--height=300",
+	}
 	for _, f := range a.folders() {
 		args = append(args, f.id, f.label, f.path)
 	}

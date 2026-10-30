@@ -93,7 +93,7 @@ func TestClosingStartupFeedbackDoesNotCancelTheGame(t *testing.T) {
 	writeTestFile(t, filepath.Join(bin, "zenity"), []byte("#!/bin/sh\nexit 1\n"))
 	writeTestFile(t, filepath.Join(bin, "umu-run"), []byte("#!/bin/sh\n/usr/bin/sleep 1\nprintf done > '"+finished+"'\n"))
 	for _, name := range []string{"zenity", "umu-run"} {
-		if err := os.Chmod(filepath.Join(bin, name), 0700); err != nil {
+		if err := os.Chmod(filepath.Join(bin, name), 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}

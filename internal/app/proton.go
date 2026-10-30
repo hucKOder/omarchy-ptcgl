@@ -84,7 +84,7 @@ func (a *App) ensureProton(ctx context.Context) error {
 		}
 	}
 	parent := filepath.Dir(root)
-	if err := os.MkdirAll(parent, 0700); err != nil {
+	if err := os.MkdirAll(parent, 0o700); err != nil {
 		return err
 	}
 	staging, err := os.MkdirTemp(parent, ".proton-*")
@@ -170,7 +170,7 @@ func extractProton(ctx context.Context, archive, dest, expectedRoot string) erro
 		return err
 	}
 	defer destination.Close()
-	if err := destination.Mkdir(expectedRoot, 0755); err != nil {
+	if err := destination.Mkdir(expectedRoot, 0o755); err != nil {
 		return err
 	}
 	tree, err := destination.OpenRoot(expectedRoot)
@@ -204,18 +204,18 @@ func extractProton(ctx context.Context, archive, dest, expectedRoot string) erro
 		}
 		switch h.Typeflag {
 		case tar.TypeDir:
-			if err := tree.MkdirAll(path, 0755); err != nil {
+			if err := tree.MkdirAll(path, 0o755); err != nil {
 				return err
 			}
-		case tar.TypeReg, tar.TypeRegA:
+		case tar.TypeReg, tar.TypeRegA: //nolint:staticcheck // Preserve support for legacy tar archives.
 			if h.Size < 0 || h.Size > 8<<30-total {
 				return fmt.Errorf("Proton archive exceeds extraction limit")
 			}
 			total += h.Size
-			if err := tree.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			if err := tree.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				return err
 			}
-			out, err := tree.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, os.FileMode(h.Mode)&0777)
+			out, err := tree.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, os.FileMode(h.Mode)&0o777)
 			if err != nil {
 				return err
 			}
@@ -246,7 +246,7 @@ func extractProton(ctx context.Context, archive, dest, expectedRoot string) erro
 		}
 		// No symlinks exist yet. An archive link used as another entry's parent
 		// becomes a directory here and is rejected at link creation, not followed.
-		if err := tree.MkdirAll(filepath.Dir(l.name), 0755); err != nil {
+		if err := tree.MkdirAll(filepath.Dir(l.name), 0o755); err != nil {
 			return err
 		}
 	}

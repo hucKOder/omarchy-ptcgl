@@ -77,9 +77,9 @@ func TestManagedRuntimeRecoveryRestagesOnlyAfterValidation(t *testing.T) {
 			var headers []*tar.Header
 			if valid {
 				for _, name := range []string{"proton", "toolmanifest.vdf", "compatibilitytool.vdf", "version"} {
-					headers = append(headers, &tar.Header{Name: "GE/" + name, Typeflag: tar.TypeReg, Mode: 0755, Size: 1})
+					headers = append(headers, &tar.Header{Name: "GE/" + name, Typeflag: tar.TypeReg, Mode: 0o755, Size: 1})
 				}
-				headers = append(headers, &tar.Header{Name: "GE/files", Typeflag: tar.TypeDir, Mode: 0755})
+				headers = append(headers, &tar.Header{Name: "GE/files", Typeflag: tar.TypeDir, Mode: 0o755})
 			} else {
 				headers = append(headers, &tar.Header{Name: "GE/proton", Typeflag: tar.TypeReg, Size: 1})
 			}

@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"ptcgl-omarchy/internal/desktop"
 )
 
 type Check struct {
@@ -131,7 +133,7 @@ func (a *App) Doctor(ctx context.Context) []Check {
 	case err != nil:
 		rulesDetail = err.Error()
 		rulesFix = fmt.Sprintf("Restore a readable Omarchy Lua configuration at %q, then run: ptcgl-omarchy integrate", mainPath)
-	case !strings.Contains(string(main), managedBlock(rulePath)):
+	case !strings.Contains(string(main), desktop.ManagedBlock(rulePath)):
 		rulesDetail = "Missing managed loader block in " + mainPath
 	default:
 		if _, err := os.ReadFile(rulePath); err != nil {

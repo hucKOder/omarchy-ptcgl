@@ -9,6 +9,32 @@ import (
 	"testing"
 )
 
+func TestCLICommandContracts(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		code int
+		out  string
+		err  string
+	}{
+		{name: "help", args: []string{"--help"}, out: "Usage: ptcgl-omarchy"},
+		{name: "version", args: []string{"--version"}, out: Name + " " + Version},
+		{name: "invalid flag", args: []string{"setup", "--json"}, code: 2, err: "--json is only valid"},
+		{name: "unexpected argument", args: []string{"setup", "unexpected"}, code: 2, err: "unexpected positional arguments"},
+		{name: "verification worker arguments", args: []string{"__verify-installer"}, code: 2, err: "requires one MSI path"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out, errOut bytes.Buffer
+			if code := RunCLI(context.Background(), tc.args, &out, &errOut); code != tc.code {
+				t.Fatalf("exit code %d, want %d; stderr: %s", code, tc.code, &errOut)
+			}
+			if !strings.Contains(out.String(), tc.out) || !strings.Contains(errOut.String(), tc.err) {
+				t.Fatalf("unexpected output: stdout=%q stderr=%q", &out, &errOut)
+			}
+		})
+	}
+}
+
 func TestGraphicalInitializationErrors(t *testing.T) {
 	for _, state := range []string{"config.json", "runtime.json"} {
 		for _, args := range [][]string{nil, {"doctor", "--gui"}, {"update", "--check", "--gui"}, {"repair", "--gui"}} {

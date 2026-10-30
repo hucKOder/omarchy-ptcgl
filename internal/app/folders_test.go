@@ -14,7 +14,7 @@ func folderApp(t *testing.T) (*App, *fakeRunner) {
 	t.Helper()
 	a, r := testApp(t)
 	for _, path := range []string{filepath.Dir(a.gamePath()), a.Paths.Config, a.Paths.Cache} {
-		if err := os.MkdirAll(path, 0700); err != nil {
+		if err := os.MkdirAll(path, 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -144,7 +144,7 @@ func TestFolderCLIUsesXDGPathsWithBrokenConfiguration(t *testing.T) {
 	openerLog := filepath.Join(filepath.Dir(dialogLog), "opened.log")
 	t.Setenv("TEST_OPEN_LOG", openerLog)
 	opener := "#!/bin/sh\nprintf '%s\\n' \"$@\" >> \"$TEST_OPEN_LOG\"\n"
-	if err := os.WriteFile(filepath.Join(filepath.Dir(dialogLog), "xdg-open"), []byte(opener), 0700); err != nil {
+	if err := os.WriteFile(filepath.Join(filepath.Dir(dialogLog), "xdg-open"), []byte(opener), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {

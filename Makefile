@@ -1,13 +1,28 @@
 GO ?= go
-VERSION ?= 0.5.0
+VERSION ?= 0.5.1
+GOFUMPT := $(GO) run mvdan.cc/gofumpt@v0.12.0
+GOIMPORTS := $(GO) run golang.org/x/tools/cmd/goimports@v0.52.0
+GOLANGCI_LINT := $(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
+GO_SOURCES := cmd internal scripts/license-notices.go
 
-.PHONY: build test check check-shell security test-plugin check-plugin install-plugin licenses install install-launcher uninstall clean
+.PHONY: build fmt fmt-check lint test check check-shell security test-plugin check-plugin install-plugin licenses install install-launcher uninstall clean
 build:
 	mkdir -p build
 	CGO_ENABLED=0 $(GO) build -mod=readonly -trimpath -ldflags '-s -w -X ptcgl-omarchy/internal/app.Version=$(VERSION)' -o build/ptcgl-omarchy ./cmd/ptcgl-omarchy
 
 test:
 	$(GO) test -race ./...
+
+fmt:
+	$(GOIMPORTS) -local ptcgl-omarchy -w $(GO_SOURCES)
+	$(GOFUMPT) -w $(GO_SOURCES)
+
+fmt-check:
+	@set -e; output="$$($(GOIMPORTS) -local ptcgl-omarchy -l $(GO_SOURCES))"; if [ -n "$$output" ]; then printf '%s\n' "$$output"; exit 1; fi
+	@set -e; output="$$($(GOFUMPT) -l $(GO_SOURCES))"; if [ -n "$$output" ]; then printf '%s\n' "$$output"; exit 1; fi
+
+lint:
+	$(GOLANGCI_LINT) run ./...
 
 check:
 	bash -n bootstrap.sh install.sh scripts/release-assets.sh scripts/plugin-install.sh scripts/plugin-local.sh scripts/check-plugin.sh scripts/check-release-policy.sh

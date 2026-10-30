@@ -10,6 +10,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"ptcgl-omarchy/internal/download"
 )
 
 // Status schema 1 is independent of doctor's existing JSON array protocol.
@@ -46,14 +48,7 @@ type InstallerCheck struct {
 	CheckedAt time.Time `json:"checked_at"`
 }
 
-type ProgressEvent struct {
-	Phase          string  `json:"phase"`
-	Message        string  `json:"message"`
-	Downloaded     int64   `json:"downloaded"`
-	Total          int64   `json:"total"` // -1 means unknown; never invent a percentage.
-	BytesPerSecond float64 `json:"bytes_per_second"`
-	Cancellable    bool    `json:"cancellable"`
-}
+type ProgressEvent = download.ProgressEvent
 
 // The lock FD, process start ticks, and boot ID bind a snapshot to the actual
 // flock owner. A recycled PID or an abandoned JSON file cannot imply activity.
@@ -91,8 +86,10 @@ func newOperation(kind string, lock *os.File) (Operation, error) {
 	if err != nil {
 		return Operation{}, err
 	}
-	return Operation{Kind: kind, PID: os.Getpid(), Start: start, Boot: strings.TrimSpace(string(boot)), LockFD: int(lock.Fd()),
-		Progress: ProgressEvent{Phase: "preparing", Message: "Preparing operation…", Total: -1}}, nil
+	return Operation{
+		Kind: kind, PID: os.Getpid(), Start: start, Boot: strings.TrimSpace(string(boot)), LockFD: int(lock.Fd()),
+		Progress: ProgressEvent{Phase: "preparing", Message: "Preparing operation…", Total: -1},
+	}, nil
 }
 
 func (o Operation) valid(p Paths) bool {
@@ -145,6 +142,9 @@ func lockBusy(p Paths) (bool, error) {
 		return false, err
 	}
 	_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	if err := checkCleanupGuard(p, false); err != nil {
+		return false, err
+	}
 	return false, nil
 }
 
@@ -163,9 +163,11 @@ func readOperation(p Paths) (Operation, bool) {
 }
 
 func unavailableStatus() Status {
-	return Status{SchemaVersion: 1, LauncherVersion: Version, Readiness: "unavailable", Activity: "unavailable", Phase: "unknown",
+	return Status{
+		SchemaVersion: 1, LauncherVersion: Version, Readiness: "unavailable", Activity: "unavailable", Phase: "unknown",
 		Message: "Status unavailable. Open diagnostics for details.", Runtime: "Unknown", Installer: InstallerStatus{Freshness: "not-checked"},
-		Capabilities: Capabilities{Diagnostics: true, Folders: true}}
+		Capabilities: Capabilities{Diagnostics: true, Folders: true},
+	}
 }
 
 func (a *App) Status(ctx context.Context) Status {
@@ -212,6 +214,9 @@ func (a *App) Status(ctx context.Context) Status {
 				s.Activity, s.Phase, s.Message = "running", "running", "Game is running. Focus returns to its window."
 				s.Progress = nil
 				s.Capabilities.Play = true
+				if op.Progress.Phase == "layout-warning" {
+					s.Phase, s.Message = "layout-warning", landscapeWarning
+				}
 			}
 		}
 		return s
