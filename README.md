@@ -123,7 +123,7 @@ bash ./install.sh --local
 ```
 
 Replace `FULL_40_HEX_COMMIT` with the source revision you intend to build.
-`make install` runs the explicit local installation flow. Local builds need Go 1.27.3+
+`make install` runs the explicit local installation flow. Local builds need Go 1.27.4+
 and Make; the installer adds them through Omarchy when needed.
 
 Prefer the terminal? Setup and launch are also available separately:
